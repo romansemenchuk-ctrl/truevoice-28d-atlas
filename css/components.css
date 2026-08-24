@@ -1,0 +1,602 @@
+/* ========================================================================
+   TrueVoice Academy — 28D Somatic Atlas Interactive Components
+   ======================================================================== */
+
+/* ── VoiceSpine & Telemetry (Fixed Right Edge) ────────────────────────── */
+.tv-spine {
+  position: fixed;
+  right: 0;
+  top: var(--head-h);
+  bottom: 0;
+  width: var(--spine-w);
+  z-index: 40;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+}
+
+.tv-spine-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.tv-spine-label {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.16em;
+  color: var(--fg-dim);
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  text-transform: uppercase;
+  z-index: 2;
+  user-select: none;
+}
+
+/* ── StarField & Ambient Drift (Fixed Background Layer) ───────────────── */
+.tv-ambient-layer {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.tv-starfield-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  mix-blend-mode: screen;
+}
+
+.tv-drift-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.45;
+  pointer-events: none;
+  animation: drift-float 24s ease-in-out infinite alternate;
+}
+
+.tv-drift-blob--a {
+  top: 10%;
+  right: -10%;
+  width: 50vw;
+  height: 50vw;
+  background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+}
+
+.tv-drift-blob--b {
+  bottom: 5%;
+  left: -15%;
+  width: 60vw;
+  height: 60vw;
+  background: radial-gradient(circle, var(--sacred-soft) 0%, transparent 75%);
+  animation-duration: 32s;
+  animation-delay: -8s;
+}
+
+@keyframes drift-float {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-5vw, 6vh) scale(1.12); }
+  100% { transform: translate(4vw, -4vh) scale(0.92); }
+}
+
+/* ── Search Modal & Results Overlay ───────────────────────────────────── */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 6, 7, 0.85);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  z-index: 200;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 80px 20px 20px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-base) ease;
+}
+
+.modal-backdrop.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.search-modal {
+  width: 100%;
+  max-width: 680px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-2);
+  display: flex;
+  flex-direction: column;
+  max-height: 80vh;
+  overflow: hidden;
+  transform: translateY(-12px) scale(0.98);
+  transition: all var(--dur-base) var(--ease-smooth);
+}
+
+.modal-backdrop.open .search-modal {
+  transform: translateY(0) scale(1);
+}
+
+.search-modal-header {
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.search-modal-input {
+  flex: 1;
+  font-family: var(--font-body);
+  font-size: 16px;
+  color: var(--fg);
+  background: transparent;
+  border: none;
+  outline: none;
+}
+
+.search-modal-input::placeholder {
+  color: var(--fg-dim);
+}
+
+.search-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+}
+
+.search-chip {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  padding: 3px 9px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  color: var(--fg-ash);
+  transition: all var(--dur-fast) ease;
+}
+
+.search-chip:hover, .search-chip.active {
+  color: var(--fg);
+  border-color: var(--accent-deep);
+  background: var(--accent-soft);
+}
+
+.search-results-list {
+  padding: 12px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.search-hit {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 14px 16px;
+  transition: all var(--dur-fast) ease;
+}
+
+.search-hit:hover, .search-hit.selected {
+  border-color: var(--accent-deep);
+  background: var(--surface-3);
+  transform: translateX(3px);
+}
+
+.hit-tag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--accent-lit);
+  letter-spacing: 0.1em;
+}
+
+.hit-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  color: var(--fg);
+}
+
+.hit-snippet {
+  font-size: 12.5px;
+  color: var(--fg-ash);
+  line-height: 1.5;
+}
+
+.hit-snippet mark {
+  background: var(--accent-soft);
+  color: var(--fg);
+  padding: 1px 3px;
+  border-radius: 2px;
+  font-weight: 500;
+}
+
+/* ── Interactive Breath Pacer Overlay / Widget ────────────────────────── */
+.breath-pacer-box {
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  box-shadow: var(--shadow-1);
+  position: relative;
+}
+
+.pacer-visual {
+  width: 200px;
+  height: 200px;
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.pacer-circle {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--accent-glow) 0%, rgba(230,0,18,0.02) 70%);
+  border: 2px solid var(--accent);
+  transition: transform 1.7s cubic-bezier(0.4, 0, 0.2, 1);
+  display: grid;
+  place-items: center;
+  position: relative;
+}
+
+.pacer-circle.inhale {
+  transform: scale(1.35);
+  border-color: var(--sacred);
+  background: radial-gradient(circle, var(--sacred-glow) 0%, rgba(201,162,39,0.02) 70%);
+}
+
+.pacer-circle.hold {
+  transform: scale(1.35);
+  border-color: var(--fg-bone);
+}
+
+.pacer-circle.exhale {
+  transform: scale(0.75);
+  border-color: var(--accent);
+  background: radial-gradient(circle, var(--accent-glow) 0%, rgba(230,0,18,0.02) 70%);
+}
+
+.pacer-counter {
+  font-family: var(--font-display);
+  font-size: 42px;
+  font-weight: 300;
+  color: var(--fg);
+  line-height: 1;
+}
+
+.pacer-phase-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--fg-ash);
+  margin-top: 4px;
+}
+
+.pacer-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ── Voice Journey Audio Recorder Widget ──────────────────────────────── */
+.recorder-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.recorder-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.recorder-wave-canvas {
+  width: 100%;
+  height: 64px;
+  background: var(--surface-2);
+  border-radius: var(--r-xs);
+  border: 1px solid var(--line-faint);
+}
+
+.recorder-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.record-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: var(--r-pill);
+  background: var(--accent-deep);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  transition: all var(--dur-fast) ease;
+}
+
+.record-btn:hover {
+  background: var(--accent);
+  box-shadow: 0 0 16px var(--accent-glow);
+}
+
+.record-btn.recording {
+  background: var(--accent);
+  animation: rec-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes rec-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+
+.recordings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.recording-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+  font-size: 12.5px;
+}
+
+.recording-audio {
+  height: 32px;
+  max-width: 200px;
+}
+
+/* ── Fullscreen Focus Practice Mode ───────────────────────────────────── */
+.focus-modal {
+  position: fixed;
+  inset: 0;
+  background: var(--void);
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-base) ease;
+}
+
+.focus-modal.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.focus-header {
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+}
+
+.focus-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  max-width: 760px;
+  margin: 0 auto;
+  text-align: center;
+  gap: 24px;
+}
+
+.focus-timer {
+  font-family: var(--font-display);
+  font-size: clamp(64px, 12vw, 120px);
+  font-weight: 300;
+  color: var(--fg);
+  line-height: 1;
+}
+
+.focus-step-title {
+  font-family: var(--font-serif);
+  font-size: 28px;
+  color: var(--fg-bone);
+}
+
+.focus-step-desc {
+  font-size: 16px;
+  line-height: 1.8;
+  color: var(--fg-muted);
+  max-width: 60ch;
+}
+
+.focus-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+/* ── Tweaks Drawer Panel ──────────────────────────────────────────────── */
+.tweaks-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 320px;
+  max-width: 90vw;
+  background: var(--surface);
+  border-left: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-2);
+  z-index: 250;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform var(--dur-base) var(--ease-smooth);
+}
+
+.tweaks-drawer.open {
+  transform: translateX(0);
+}
+
+.tweaks-head {
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tweaks-body {
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.tweak-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tweak-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-ash);
+}
+
+.color-swatches {
+  display: flex;
+  gap: 10px;
+}
+
+.color-swatch {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  transition: transform var(--dur-fast) ease;
+}
+
+.color-swatch:hover, .color-swatch.active {
+  transform: scale(1.18);
+  border-color: #fff;
+}
+
+.toggle-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--fg-muted);
+}
+
+.toggle-switch input {
+  appearance: none;
+  width: 40px;
+  height: 22px;
+  background: var(--surface-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  position: relative;
+  cursor: pointer;
+  outline: none;
+  transition: background var(--dur-fast) ease;
+}
+
+.toggle-switch input::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--fg-ash);
+  transition: transform var(--dur-fast) ease, background var(--dur-fast) ease;
+}
+
+.toggle-switch input:checked {
+  background: var(--accent-deep);
+  border-color: var(--accent);
+}
+
+.toggle-switch input:checked::after {
+  transform: translateX(18px);
+  background: #fff;
+}
+
+/* ── Toast Notifications ──────────────────────────────────────────────── */
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 400;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  background: var(--surface-3);
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--accent);
+  color: var(--fg);
+  padding: 12px 18px;
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-1);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  animation: toast-slide 0.3s var(--ease-out);
+}
+
+@keyframes toast-slide {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}

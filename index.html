@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="uk" data-theme="default">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <meta name="theme-color" content="#060607"/>
+  <title>TRUEVOICE — 28-денний Соматичний Атлас Голосу</title>
+  <meta name="description" content="Повна 4-тижнева соматична система трансформації голосу від TrueVoice Academy. 28 уроків: дихання, вагус, фасції, акупресура, резонанс та вільне звучання."/>
+
+  <!-- Preconnect & Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link rel="stylesheet" href="css/tokens.css"/>
+  <link rel="stylesheet" href="css/styles.css"/>
+  <link rel="stylesheet" href="css/components.css"/>
+  <link rel="stylesheet" href="css/responsive.css"/>
+</head>
+<body>
+
+  <a class="skip" href="#pane">До змісту уроку</a>
+
+  <!-- Ambient FX Layer: StarField Parallax & Color Drift -->
+  <div class="tv-ambient-layer" aria-hidden="true">
+    <canvas id="starfield-canvas" class="tv-starfield-canvas"></canvas>
+    <div class="tv-drift-blob tv-drift-blob--a"></div>
+    <div class="tv-drift-blob tv-drift-blob--b"></div>
+  </div>
+
+  <!-- VoiceSpine Telemetry Oscillogram (Fixed Right Edge) -->
+  <aside class="tv-spine" aria-hidden="true">
+    <canvas id="spine-canvas" class="tv-spine-canvas"></canvas>
+    <div class="tv-spine-label">VOX · 432 HZ</div>
+    <div class="tv-spine-label">REC · ∞</div>
+  </aside>
+
+  <!-- Sticky Header -->
+  <header class="head">
+    <div class="head-in">
+      <a href="#" class="brand" aria-label="TrueVoice Атлас — На головну">
+        <div class="brand-badge">
+          <span class="dot"></span>
+        </div>
+        <div class="brand-text">
+          <span class="brand-mark">TRUEVOICE</span>
+          <span class="brand-sub">28D Соматичний Атлас</span>
+        </div>
+      </a>
+
+      <div class="head-tools">
+        <!-- Quick Search -->
+        <div class="search-box">
+          <input id="search-input-header" class="search-input" type="search" readonly placeholder="Пошук по 28 уроках..." aria-label="Пошук по атласу"/>
+          <kbd class="search-kbd">/</kbd>
+        </div>
+
+        <button class="icon-btn mobile-search-btn" id="mobile-search-btn" style="display:none" aria-label="Відкрити пошук" title="Пошук">
+          🔍
+        </button>
+
+        <!-- View Mode Switcher -->
+        <div class="seg" role="group" aria-label="Режим перегляду">
+          <button class="seg-btn" id="m-stu" aria-pressed="true">Студент</button>
+          <button class="seg-btn" id="m-int" aria-pressed="false">Внутрішній</button>
+        </div>
+
+        <!-- 432 Hz Ambient Audio Toggle -->
+        <button class="icon-btn" id="btn-ambient-drone" aria-pressed="false" aria-label="Увімкнути 432 Hz Ambient Резонанс" title="432 Hz Ambient Drone (Клавіша M)">
+          ♪
+        </button>
+
+        <!-- Settings / Tweaks Button -->
+        <button class="icon-btn" id="btn-open-tweaks" aria-label="Налаштування атласу" title="Налаштування теми та системи">
+          ⚙
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Global Progress & Telemetry HUD -->
+  <div class="progress-hud">
+    <div class="hud-stats">
+      <div class="hud-stat-item">
+        <span class="hud-stat-label">Прогрес:</span>
+        <span class="hud-stat-val accent" id="hud-pct-val">0%</span>
+      </div>
+      <div class="hud-stat-item">
+        <span class="hud-stat-label">Пройдено:</span>
+        <span class="hud-stat-val" id="hud-done-val">0 / 28</span>
+      </div>
+      <div class="hud-stat-item">
+        <span class="hud-stat-label">Час практики:</span>
+        <span class="hud-stat-val gold" id="hud-mins-val">0 хв</span>
+      </div>
+      <div class="hud-stat-item">
+        <span class="hud-stat-label">Серія:</span>
+        <span class="hud-stat-val" id="hud-streak-val">1 дн</span>
+      </div>
+    </div>
+    <div class="hud-stat-item mono" style="font-size:11px;color:var(--fg-ash)">
+      4 ТИЖНІ · 28 ПРАКТИК · 100% OFFLINE
+    </div>
+  </div>
+
+  <!-- 4-Week Tabs -->
+  <nav class="weeks" role="tablist" aria-label="Тижні курсу" id="weeks"></nav>
+
+  <!-- Mobile Quick Lesson Picker -->
+  <div class="mobile-picker" style="display:none">
+    <label class="sr-only" for="mobile-pick">Вибір уроку</label>
+    <select id="mobile-pick" class="mobile-select"></select>
+  </div>
+
+  <!-- Main Grid Shell -->
+  <div class="shell">
+    <nav class="rail" id="rail" aria-label="Уроки обраного тижня"></nav>
+    <main id="pane" class="pane" tabindex="-1"></main>
+  </div>
+
+  <!-- ── Modals & Drawers ────────────────────────────────────────────────── -->
+
+  <!-- Search Modal -->
+  <div class="modal-backdrop" id="search-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="search-modal-title">
+    <div class="search-modal">
+      <div class="search-modal-header">
+        <span style="color:var(--accent-lit);font-size:18px">🔍</span>
+        <input id="search-modal-input" class="search-modal-input" type="search" placeholder="Пошук теорії, вправ, анатомії, дихання..." autocomplete="off"/>
+        <button class="icon-btn" id="search-modal-close" aria-label="Закрити пошук">✕</button>
+      </div>
+
+      <div class="search-chips">
+        <button class="search-chip" data-tag="вагус">#Вагус</button>
+        <button class="search-chip" data-tag="дихання">#Дихання</button>
+        <button class="search-chip" data-tag="щелеп">#Щелепа</button>
+        <button class="search-chip" data-tag="фасц">#Фасції</button>
+        <button class="search-chip" data-tag="асан">#Асани</button>
+        <button class="search-chip" data-tag="пранаям">#Пранаяма</button>
+        <button class="search-chip" data-tag="флоу">#Флоу</button>
+        <button class="search-chip" data-tag="виступ">#Виступ</button>
+        <button class="search-chip" data-tag="резонанс">#Резонанс</button>
+      </div>
+
+      <div class="search-results-list" id="search-results"></div>
+    </div>
+  </div>
+
+  <!-- Voice Recorder Modal -->
+  <div class="modal-backdrop" id="voice-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="voice-modal-title">
+    <div class="search-modal" style="max-width:540px">
+      <div class="search-modal-header">
+        <span style="color:var(--accent-lit);font-size:18px">🎙</span>
+        <h2 id="voice-modal-title" style="font-size:16px;flex:1">Запис голосового зразка</h2>
+        <button class="icon-btn" id="voice-modal-close" aria-label="Закрити вікно запису">✕</button>
+      </div>
+
+      <div style="padding:20px;display:flex;flex-direction:column;gap:16px">
+        <p style="font-size:13px;color:var(--fg-ash);line-height:1.6">
+          Запиши 15–30 секунд свого голосу: промов будь-яку фразу або виголоси звук «Хааа» / «Мммм». Порівнюй своє звучання до і після 28 днів практики.
+        </p>
+
+        <canvas id="voice-wave-canvas" class="recorder-wave-canvas"></canvas>
+
+        <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin:8px 0">
+          <button class="record-btn" id="modal-record-btn">
+            🎙 Почати запис
+          </button>
+        </div>
+
+        <div class="section-head" style="margin-top:8px">
+          <span class="eyebrow">Історія записів уроку</span>
+        </div>
+
+        <div class="recordings-list" id="recordings-history-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fullscreen Focus Practice Player Modal -->
+  <div class="focus-modal" id="focus-modal" role="dialog" aria-modal="true" aria-label="Режим занурення в практику">
+    <header class="focus-header">
+      <div class="eyebrow mono focus-step-meta">КРОК 1 З 3 · ПРАКТИКА</div>
+      <button class="btn" id="focus-close-btn">✕ Вийти (Esc)</button>
+    </header>
+
+    <div class="focus-body">
+      <div class="focus-timer mono" id="focus-timer-val">05:00</div>
+      <h2 class="focus-step-title">Назва вправи</h2>
+      <p class="focus-step-desc">Інструкція виконання соматичної практики...</p>
+
+      <div class="focus-controls">
+        <button class="btn" id="focus-prev-btn">← Попередній крок</button>
+        <button class="btn primary" id="focus-play-btn" style="min-width:140px;padding:12px 24px;font-size:15px">
+          ⏸ Пауза
+        </button>
+        <button class="btn" id="focus-next-btn">Наступний крок →</button>
+      </div>
+
+      <div class="mono" style="font-size:11px;color:var(--fg-dim);margin-top:12px">
+        Пробіл — Пауза/Старт · Стрілки — Навігація між кроками
+      </div>
+    </div>
+  </div>
+
+  <!-- Tweaks / Customization Drawer Panel -->
+  <aside class="tweaks-drawer" id="tweaks-drawer" aria-label="Панель налаштувань">
+    <div class="tweaks-head">
+      <h3 style="font-size:15px;letter-spacing:0.08em;text-transform:uppercase">Налаштування</h3>
+      <button class="icon-btn" id="btn-close-tweaks" aria-label="Закрити налаштування">✕</button>
+    </div>
+
+    <div class="tweaks-body">
+      <!-- Accent Theme -->
+      <div class="tweak-group">
+        <span class="tweak-label">Сигнальний колір теми</span>
+        <div class="color-swatches">
+          <button class="color-swatch active" data-theme="default" data-color="#E60012" style="background:#E60012" title="TrueVoice Red"></button>
+          <button class="color-swatch" data-theme="crimson" data-color="#C8102E" style="background:#C8102E" title="Deep Crimson"></button>
+          <button class="color-swatch" data-theme="gold" data-color="#C9A227" style="background:#C9A227" title="Sacred Gold"></button>
+          <button class="color-swatch" data-theme="sage" data-color="#4E8C6A" style="background:#4E8C6A" title="Forest Sage"></button>
+        </div>
+      </div>
+
+      <!-- Atmosphere Toggles -->
+      <div class="tweak-group">
+        <span class="tweak-label">Візуальна атмосфера</span>
+        <label class="toggle-switch">
+          <span>VoiceSpine (Осцилограма)</span>
+          <input type="checkbox" id="toggle-spine" checked/>
+        </label>
+        <label class="toggle-switch">
+          <span>Звукові ефекти (Дзвін/Таймер)</span>
+          <input type="checkbox" id="toggle-sound-fx" checked/>
+        </label>
+      </div>
+
+      <!-- Backup & Data -->
+      <div class="tweak-group" style="margin-top:14px;border-top:1px solid var(--line);padding-top:18px">
+        <span class="tweak-label">Керування даними</span>
+        <button class="btn" id="btn-export-data" style="width:100%;justify-content:center">
+          ⬇ Експорт прогресу (JSON)
+        </button>
+        <button class="btn" id="btn-import-data" style="width:100%;justify-content:center">
+          ⬆ Імпорт прогресу
+        </button>
+        <input type="file" id="file-import-input" accept=".json" style="display:none"/>
+        <button class="btn" id="btn-reset-data" style="width:100%;justify-content:center;color:#E8483A;border-color:rgba(232,72,58,0.3)">
+          Скинути весь прогрес
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toast-container" aria-live="polite"></div>
+
+  <!-- Scripts -->
+  <script src="js/data/lessons.js"></script>
+  <script src="js/modules/audio-engine.js"></script>
+  <script src="js/modules/ambient-canvas.js"></script>
+  <script src="js/modules/breath-pacer.js"></script>
+  <script src="js/modules/diagrams.js"></script>
+  <script src="js/modules/voice-recorder.js"></script>
+  <script src="js/modules/focus-mode.js"></script>
+  <script src="js/modules/storage.js"></script>
+  <script src="js/app.js"></script>
+
+</body>
+</html>

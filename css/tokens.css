@@ -1,0 +1,117 @@
+/* ========================================================================
+   TrueVoice Academy — 28D Somatic Atlas Design Tokens
+   Cinematic Somatic Aesthetic: Deep Void · Blood Red · Sacred Gold · Off-White Air
+   ======================================================================== */
+
+@import url("https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600;700&family=Literata:ital,opsz,wght@0,7..72,300;0,7..72,400;0,7..72,500;1,7..72,300;1,7..72,400&family=Manrope:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500;600&display=swap");
+
+:root {
+  /* ── Core Background Surfaces ────────────────────────────────────────── */
+  --void:           #060607;   /* Absolute ground / deepest stage */
+  --bg:             #0B0B0D;   /* Dark base body */
+  --surface:        #141013;   /* Primary card / section surface */
+  --surface-2:      #1D171B;   /* Elevated hover & active states */
+  --surface-3:      #261E23;   /* Floating dialogs & active tabs */
+  --surface-trans:  rgba(20, 16, 19, 0.82); /* Glass backdrop */
+
+  /* ── Hairline Borders & Dividers ─────────────────────────────────────── */
+  --line:           rgba(245, 245, 242, 0.08); /* Hairline standard border */
+  --line-strong:    rgba(245, 245, 242, 0.16); /* Active / hover border */
+  --line-faint:     rgba(245, 245, 242, 0.04); /* Sub-divider */
+  --edge:           #332A2E;   /* Muted organic outline */
+
+  /* ── Signature Brand Accents ─────────────────────────────────────────── */
+  --accent:         #E60012;   /* Kinetic TrueVoice Red */
+  --accent-lit:     #FF382E;   /* Lit ember / bright highlight */
+  --accent-deep:    #8F0C15;   /* Deep crimson / borders */
+  --accent-soft:    rgba(230, 0, 18, 0.12); /* Soft highlight tint */
+  --accent-glow:    rgba(230, 0, 18, 0.40); /* Pulsing bloom */
+
+  /* ── Sacred & Status Accents ─────────────────────────────────────────── */
+  --sacred:         #C9A227;   /* Sacred Gold — ritual & sound resonance */
+  --sacred-lit:     #E5BA35;
+  --sacred-soft:    rgba(201, 162, 39, 0.14);
+  --sacred-glow:    rgba(201, 162, 39, 0.35);
+
+  --ok:             #4E8C6A;   /* Forest Sage — completed / grounded */
+  --ok-soft:        rgba(78, 140, 106, 0.16);
+
+  /* ── Typography Colors ───────────────────────────────────────────────── */
+  --fg:             #F5F5F2;   /* Off-White / The Air — Primary text */
+  --fg-bone:        #EDE4DA;   /* Warm bone text */
+  --fg-muted:       #B4B4B0;   /* Secondary readable text */
+  --fg-ash:         #8B7F7A;   /* Somatic captions & labels */
+  --fg-dim:         #5A5054;   /* Disabled & subtle telemetry */
+  --fg-dark:        #2E272B;   /* Faint watermark numbers */
+
+  /* ── Type Families ───────────────────────────────────────────────────── */
+  --font-display:   'Oswald', -apple-system, sans-serif;
+  --font-serif:     'Literata', Georgia, serif;
+  --font-body:      'Manrope', -apple-system, system-ui, sans-serif;
+  --font-mono:      'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+
+  /* ── Spacing Scale (4px / 8px grid) ──────────────────────────────────── */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+  --s7: 48px;
+  --s8: 64px;
+  --s9: 96px;
+
+  /* ── Layout Metric Variables ─────────────────────────────────────────── */
+  --rail-w:         300px;
+  --head-h:         68px;
+  --hud-h:          58px;
+  --spine-w:        32px;
+  --content-max:    980px;
+
+  /* ── Radii ───────────────────────────────────────────────────────────── */
+  --r-0:    0px;
+  --r-xs:   2px;
+  --r-sm:   4px;
+  --r-md:   8px;
+  --r-lg:   12px;
+  --r-pill: 999px;
+
+  /* ── Shadows & Glows ─────────────────────────────────────────────────── */
+  --shadow-1:       0 8px 24px rgba(0, 0, 0, 0.55);
+  --shadow-2:       0 16px 40px rgba(0, 0, 0, 0.75);
+  --shadow-glow:    0 0 40px var(--accent-soft);
+  --shadow-gold:    0 0 35px var(--sacred-soft);
+
+  /* ── Motion Curves ───────────────────────────────────────────────────── */
+  --ease-smooth:    cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-out:       cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out:    cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast:       180ms;
+  --dur-base:       300ms;
+  --dur-slow:       550ms;
+}
+
+/* Theme Variant Overrides */
+[data-theme="crimson"] {
+  --accent:       #C8102E;
+  --accent-lit:   #E82C4A;
+  --accent-deep:  #7A0818;
+  --accent-soft:  rgba(200, 16, 46, 0.14);
+  --accent-glow:  rgba(200, 16, 46, 0.40);
+}
+
+[data-theme="gold"] {
+  --accent:       #C9A227;
+  --accent-lit:   #E5BA35;
+  --accent-deep:  #7D6210;
+  --accent-soft:  rgba(201, 162, 39, 0.16);
+  --accent-glow:  rgba(201, 162, 39, 0.45);
+}
+
+[data-theme="sage"] {
+  --accent:       #4E8C6A;
+  --accent-lit:   #68B28B;
+  --accent-deep:  #29533C;
+  --accent-soft:  rgba(78, 140, 106, 0.16);
+  --accent-glow:  rgba(78, 140, 106, 0.45);
+}

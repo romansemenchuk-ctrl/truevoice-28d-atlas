@@ -1,0 +1,222 @@
+/* ========================================================================
+   TrueVoice Academy — 28D Somatic Atlas Responsive & Print Styles
+   ======================================================================== */
+
+/* ── Large Screens & Desktops ─────────────────────────────────────────── */
+@media (min-width: 1400px) {
+  :root {
+    --rail-w: 320px;
+    --content-max: 1040px;
+  }
+}
+
+/* ── Laptops & Medium Screens ─────────────────────────────────────────── */
+@media (max-width: 1120px) {
+  :root {
+    --rail-w: 260px;
+  }
+  .pane {
+    padding: var(--s5) var(--s5) var(--s8);
+  }
+}
+
+/* ── Tablets & Mobile (Collapsible Rail & Mobile Picker) ───────────────── */
+@media (max-width: 860px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .rail {
+    display: none; /* Hide sticky desktop rail on mobile */
+  }
+
+  .tv-spine {
+    display: none; /* Hide spine on small mobile viewports */
+  }
+
+  .mobile-picker {
+    display: flex !important;
+    position: sticky;
+    top: var(--head-h);
+    z-index: 50;
+    background: var(--void);
+    border-bottom: 1px solid var(--line);
+    padding: 10px var(--s4);
+    align-items: center;
+    gap: 10px;
+  }
+
+  .mobile-select {
+    font-family: var(--font-body);
+    font-size: 13.5px;
+    color: var(--fg);
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-sm);
+    padding: 10px 12px;
+    flex: 1;
+    min-width: 0;
+    outline: none;
+  }
+
+  .weeks {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .week-tab:nth-child(3),
+  .week-tab:nth-child(4) {
+    border-top: 1px solid var(--line);
+  }
+
+  .week-tab:nth-child(odd) {
+    border-left: none;
+  }
+
+  .head-in {
+    padding: 0 var(--s4);
+  }
+
+  .brand-sub {
+    display: none;
+  }
+
+  .search-input {
+    width: 140px;
+  }
+  .search-input:focus {
+    width: 180px;
+  }
+
+  .pane {
+    padding: var(--s5) var(--s4) var(--s8);
+  }
+
+  .progress-hud {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px var(--s4);
+  }
+}
+
+/* ── Small Mobile Phones ──────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  .head-tools {
+    gap: var(--s2);
+  }
+
+  .search-box {
+    display: none; /* Accessible via search modal icon on mobile */
+  }
+
+  .mobile-search-btn {
+    display: grid !important;
+  }
+
+  .step-card {
+    flex-direction: column;
+  }
+
+  .step-check-btn {
+    width: 100%;
+    height: 38px;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+    flex-direction: row;
+    gap: 8px;
+  }
+
+  .step-body {
+    padding: 14px 16px;
+  }
+
+  .schemas-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .actions-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .actions-row .btn {
+    justify-content: center;
+  }
+}
+
+/* ── Accessibility & Reduced Motion ───────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .tv-drift-blob {
+    animation: none !important;
+  }
+}
+
+/* ── Print Stylesheet (Clean High-Contrast Physical Handout) ─────────── */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #111111 !important;
+  }
+
+  .head,
+  .weeks,
+  .progress-hud,
+  .rail,
+  .mobile-picker,
+  .pager,
+  .actions-row,
+  .step-check-btn,
+  .step-timer-row,
+  .tv-spine,
+  .tv-ambient-layer,
+  .tweaks-drawer,
+  .modal-backdrop,
+  .toast-container {
+    display: none !important;
+  }
+
+  .shell {
+    display: block !important;
+  }
+
+  .pane {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+
+  .sense-quote,
+  .theory-card,
+  .step-card,
+  .hw-box,
+  .pain-box,
+  figure.schema {
+    background: #ffffff !important;
+    border: 1px solid #cccccc !important;
+    box-shadow: none !important;
+    color: #111111 !important;
+    break-inside: avoid;
+  }
+
+  .step-name,
+  .lesson-title,
+  h1, h2, h3 {
+    color: #000000 !important;
+  }
+
+  .theory-card p,
+  .step-body p,
+  .hw-box,
+  .pain-box p {
+    color: #333333 !important;
+  }
+
+  figure.schema svg {
+    filter: invert(1) hue-rotate(180deg);
+  }
+}
