@@ -1,0 +1,4 @@
+/* Status stays in document flow and never covers anatomy controls. */
+.academy-sync{position:relative;inset:auto;min-height:42px}
+html{scroll-padding-top:90px;scroll-padding-bottom:70px}
+.atlas-zone-list button,.atlas-tabs button{scroll-margin-block:100px}
