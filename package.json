@@ -1,0 +1,8 @@
+{
+  "name": "truevoice-28d-atlas",
+  "version": "3.0.0",
+  "private": true,
+  "description": "TrueVoice 28-day somatic voice atlas with an interactive anatomy lab",
+  "engines": { "node": ">=20.9.0" },
+  "scripts": { "build": "node scripts/build.mjs", "test:browser": "node tests/smoke.cjs" }
+}
