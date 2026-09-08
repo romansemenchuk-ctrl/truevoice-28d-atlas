@@ -1,0 +1,5 @@
+/* Anatomy mechanics use the same phase samples as the breath guide; no parallel breath timer. */
+.atlas-workbench .diaphragm-motion{transform:none}
+.atlas-workbench .lung-motion{transform:scale(calc(.96 + var(--lung-expansion,0)*.045))}
+.atlas-workbench [data-breath-flow]{animation:none;transition:none}
+.atlas-document-hidden .fold,.atlas-document-hidden .flow-line{animation-play-state:paused}

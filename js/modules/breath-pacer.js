@@ -33,7 +33,7 @@ class BreathPacer {
   stop() {
     if(this.isRunning)this.elapsed+=performance.now()-this.anchor;
     this.isRunning=false;cancelAnimationFrame(this.timer);this.timer=null;
-    this.activeEl?.classList.add('is-paused');this.syncButton();
+    this.activeEl?.classList.add('is-paused');this.updateDOM(this.elapsed);this.syncButton();
   }
   reset() {this.stop();this.elapsed=0;this.currentPhase=0;this.currentCount=this.currentPattern[0];this.lastPhase=-1;this.updateDOM(0);}
   toggle(el) {if(this.isRunning)this.stop();else this.start(el);return this.isRunning;}
@@ -58,6 +58,8 @@ class BreathPacer {
     if(count&&count.textContent!==String(s.remaining))count.textContent=s.remaining;
     if(label&&label.textContent!==this.phaseLabels[s.phase])label.textContent=this.phaseLabels[s.phase];
     const expansion=s.phase===0?s.progress:s.phase===1?1:s.phase===2?1-s.progress:0;
+    this.activeEl.dataset.breathPhase=String(s.phase);
+    this.activeEl.dispatchEvent(new CustomEvent('atlas:breath-frame',{detail:{phase:s.phase,progress:s.progress,expansion,remaining:s.remaining,running:this.isRunning,reduced:this.motion.matches}}));
     this.activeEl.style.setProperty('--breath',this.motion.matches?0.5:expansion.toFixed(4));
     this.activeEl.style.setProperty('--phase-progress',`${(s.progress*100).toFixed(2)}%`);
     this.activeEl.classList.toggle('is-paused',!this.isRunning);
