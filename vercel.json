@@ -1,21 +1,12 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "version": 2,
-  "buildCommand": "node scripts/build.mjs",
-  "outputDirectory": "dist",
-  "framework": null,
-  "cleanUrls": true,
-  "trailingSlash": false,
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "Permissions-Policy", "value": "microphone=(self), camera=(), geolocation=()" },
-        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
-      ]
-    }
-  ]
+ "$schema":"https://openapi.vercel.sh/vercel.json","version":2,
+ "buildCommand":"node scripts/build.mjs","outputDirectory":"dist","framework":null,
+ "cleanUrls":true,"trailingSlash":false,
+ "functions":{"api/academy.js":{"includeFiles":"_server/**"}},
+ "headers":[{"source":"/(.*)","headers":[
+ {"key":"X-Content-Type-Options","value":"nosniff"},
+ {"key":"X-Frame-Options","value":"DENY"},
+ {"key":"Referrer-Policy","value":"strict-origin-when-cross-origin"},
+ {"key":"Permissions-Policy","value":"microphone=(self), camera=(), geolocation=()"},
+ {"key":"Cache-Control","value":"private, no-store, max-age=0"}]}]
 }
