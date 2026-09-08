@@ -1,4 +1,9 @@
 .DS_Store
-.vercel
-node_modules
+.vercel/
+node_modules/
+dist/
+.cache/
 *.log
+.env
+.env.*
+!.env.example
