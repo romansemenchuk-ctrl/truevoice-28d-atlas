@@ -26,7 +26,7 @@ const escapeHTML=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>'
 function diagram(view){
  const base='<svg viewBox="0 0 600 750" role="img" aria-label="Спрощена навчальна схема" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="atlas-tissue" x2="1" y2="1"><stop stop-color="#e85d51"/><stop offset="1" stop-color="#65131c"/></linearGradient></defs>';
  const text=(x,y,t)=>`<text x="${x}" y="${y}" text-anchor="middle" fill="#efe6d4" font-size="20" font-family="sans-serif">${t}</text>`;
- if(view==='breath')return base+`<g fill="none" stroke="#a99479" stroke-width="3"><path d="M285 100V250L225 315M315 100V250L375 315"/><path d="M300 80V250"/></g><g class="lung-motion" fill="url(#atlas-tissue)" stroke="#edaa8a" stroke-width="2"><path d="M260 230C215 180 135 230 125 355S140 495 260 460Z"/><path d="M340 230C385 180 465 230 475 355S460 495 340 460Z"/></g><g class="diaphragm-motion"><path d="M105 515Q300 360 495 515L490 540Q300 400 110 540Z" fill="url(#atlas-tissue)" stroke="#efca91" stroke-width="2"/></g><path d="M300 290V380" stroke="#eed394" stroke-width="2" stroke-dasharray="8 8" class="flow-line"/>${text(300,160,'ТРАХЕЯ')}${text(300,580,'ДІАФРАГМА')}${text(300,650,'На вдиху купол опускається')}</svg>`;
+ if(view==='breath')return base+`<g fill="none" stroke="#a99479" stroke-width="3"><path d="M285 100V250L225 315M315 100V250L375 315"/><path d="M300 80V250"/></g><g class="lung-motion" fill="url(#atlas-tissue)" stroke="#edaa8a" stroke-width="2"><path d="M260 230C215 180 135 230 125 355S140 495 260 460Z"/><path d="M340 230C385 180 465 230 475 355S460 495 340 460Z"/></g><g class="diaphragm-motion"><path data-diaphragm-dome d="M105 515Q300 360 495 515L490 540Q300 400 110 540Z" fill="url(#atlas-tissue)" stroke="#efca91" stroke-width="2"/></g><path data-breath-flow d="M300 175V350" stroke="#eed394" stroke-width="3" stroke-dasharray="9 13"/>${text(300,160,'ТРАХЕЯ')}${text(300,580,'ДІАФРАГМА')}<text data-mechanics-phase x="300" y="650" text-anchor="middle" fill="#efe6d4" font-size="20" font-family="sans-serif">ВДИХ</text>${text(300,691,'Рух синхронізований із тренажером')}</svg>`;
  if(view==='larynx')return base+`<path d="M300 150C135 145 100 325 140 490Q300 620 460 490C500 325 465 145 300 150Z" fill="#321820" stroke="#ba9d7a" stroke-width="5"/><path d="M300 225L240 485Q300 525 360 485Z" fill="#08090b"/><path class="fold fold-left" d="M300 225Q243 335 237 480" fill="none" stroke="#ecd9ba" stroke-width="18" stroke-linecap="round"/><path class="fold fold-right" d="M300 225Q357 335 363 480" fill="none" stroke="#ecd9ba" stroke-width="18" stroke-linecap="round"/><circle cx="231" cy="485" r="23" fill="#bc726c"/><circle cx="369" cy="485" r="23" fill="#bc726c"/>${text(300,100,'ГОРТАНЬ · ВИД ЗВЕРХУ')}${text(300,590,'ГОЛОСОВА ЩІЛИНА')}${text(300,670,'Рух умовний і сильно сповільнений')}</svg>`;
  if(view==='body')return base+`<g fill="#28151b" stroke="#bca785" stroke-width="3"><ellipse cx="300" cy="130" rx="48" ry="62"/><path d="M278 190L250 220L215 235L175 400L200 410L242 285L250 410L245 475L233 650L267 650L297 485L303 485L333 650L367 650L355 475L350 410L358 285L400 410L425 400L385 235L350 220L322 190"/></g><path d="M300 75V680" stroke="#ed8d71" stroke-width="2" stroke-dasharray="5 8"/><path d="M185 680H415" stroke="#baa582" stroke-width="2"/><g fill="#f59577">${[208,285,365,460,675].map(y=>`<circle cx="300" cy="${y}" r="6"/>`).join('')}</g>${text(300,725,'Орієнтир постави, не анатомічний канал')}</svg>`;
  return base+`<g fill="#2b171d" stroke="#b7a087" stroke-width="2"><rect x="120" y="85" width="360" height="110" rx="28"/><rect x="160" y="300" width="280" height="110" rx="28"/><rect x="100" y="515" width="400" height="110" rx="28"/></g><g fill="none" stroke="#f27b63" stroke-width="3" stroke-dasharray="9 9" class="flow-line"><path d="M300 495V430M300 280V215"/></g><g fill="#f27b63"><path d="M290 442L300 425L310 442Z"/><path d="M290 230L300 213L310 230Z"/></g>${text(300,133,'ГЛОТКА · РОТ · НІС')}${text(300,165,'акустичний фільтр')}${text(300,347,'ГОРТАНЬ')}${text(300,380,'джерело коливань')}${text(300,563,'ЛЕГЕНІ ТА ДИХАЛЬНІ М’ЯЗИ')}${text(300,600,'повітряний потік')}${text(300,710,'Модель «джерело — фільтр»')}</svg>`;
@@ -41,7 +41,7 @@ export class AnatomyViewer{
  const p=PLATES[this.view],q=s=>this.root.querySelector(s);this.zone=0;this.resetZoom();q('.atlas-stage-tag').textContent=p.tag;q('.atlas-plate-title').textContent=p.title;const img=q('.atlas-image');img.alt=`${p.label}: художня анатомічна ілюстрація TrueVoice`;
  img.onerror=()=>{this.mode='diagram';this.updateMode();q('.atlas-caption').textContent='Ілюстрація недоступна. Показано локальну навчальну схему.';};img.src=`assets/anatomy/${this.view}.webp`;
  q('.atlas-hotspots').innerHTML=p.zones.map((z,i)=>`<button type="button" class="atlas-hotspot" data-zone="${i}" style="left:${z[2]}%;top:${z[3]}%" aria-label="${escapeHTML(z[1])}" aria-pressed="${i===0}"><span>${i+1}</span><em>${escapeHTML(z[1])}</em></button>`).join('');
- q('.atlas-zone-list').innerHTML=p.zones.map((z,i)=>`<button type="button" data-zone="${i}" aria-pressed="${i===0}"><span class="mono">0${i+1}</span>${escapeHTML(z[1])}</button>`).join('');q('.atlas-schematic').innerHTML=diagram(this.view);this.root.querySelectorAll('[data-plate]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.plate===this.view)));this.selectZone(0);this.updateMode();
+ q('.atlas-zone-list').innerHTML=p.zones.map((z,i)=>`<button type="button" data-zone="${i}" aria-pressed="${i===0}"><span class="mono">0${i+1}</span>${escapeHTML(z[1])}</button>`).join('');q('.atlas-schematic').innerHTML=diagram(this.view);this.root.querySelectorAll('[data-plate]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.plate===this.view)));this.selectZone(0);this.updateMode();const pacer=window.breathPacer;if(pacer.activeEl===this.root)pacer.updateDOM(pacer.elapsed+(pacer.isRunning?performance.now()-pacer.anchor:0));
  }
  selectZone(i){const z=PLATES[this.view].zones[i];if(!z)return;this.zone=i;this.root.querySelector('.atlas-fact h4').textContent=z[1];this.root.querySelector('.atlas-fact p').textContent=z[4];this.root.querySelectorAll('[data-zone]').forEach(b=>b.setAttribute('aria-pressed',String(Number(b.dataset.zone)===i)));}
  updateMode(){this.root.querySelector('.atlas-transform').hidden=this.mode!=='art';this.root.querySelector('.atlas-schematic').hidden=this.mode!=='diagram';this.root.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===this.mode)));this.root.querySelectorAll('[data-zoom]').forEach(b=>b.disabled=this.mode!=='art');}
@@ -49,15 +49,38 @@ export class AnatomyViewer{
  resetZoom(){this.zoom=1;this.x=0;this.y=0;if(this.root)this.transform();}
  changeZoom(d){this.zoom=Math.max(1,Math.min(3,this.zoom+d));this.transform();}
  setExpanded(value){this.root.classList.toggle('atlas-expanded',value);this.root.querySelector('[data-expand]').setAttribute('aria-pressed',String(value));if(value){this.oldOverflow=document.body.style.overflow;document.body.style.overflow='hidden';this.root.setAttribute('role','dialog');this.root.setAttribute('aria-modal','true');}else{document.body.style.overflow=this.oldOverflow||'';this.root.removeAttribute('role');this.root.removeAttribute('aria-modal');}this.resetZoom();}
+ updateBreathDrawing(frame){
+  this.lastBreathFrame=frame;
+  const reduced=frame.reduced||!this.motion;
+  const amount=reduced ? 0.5 : Math.max(0,Math.min(1,frame.expansion));
+  const dome=this.root.querySelector('[data-diaphragm-dome]');
+  if(dome)dome.setAttribute('d',`M105 515Q300 ${360+amount*66} 495 515L490 540Q300 ${400+amount*61} 110 540Z`);
+  const lungs=this.root.querySelector('.lung-motion');
+  if(lungs)lungs.style.setProperty('--lung-expansion',String(amount));
+  const flow=this.root.querySelector('[data-breath-flow]');
+  if(flow){
+   const moving=frame.phase===0||frame.phase===2;
+   flow.dataset.direction=frame.phase===0?'inhale':frame.phase===2?'exhale':'hold';
+   flow.style.opacity=moving&&!reduced?'1':'0';
+   flow.style.strokeDashoffset=String((frame.phase===0?-1:1)*frame.progress*110);
+  }
+  const caption=this.root.querySelector('[data-mechanics-phase]');
+  const label=['ВДИХ · КУПОЛ ОПУСКАЄТЬСЯ','ПАУЗА ПІСЛЯ ВДИХУ','ВИДИХ · КУПОЛ ПІДНІМАЄТЬСЯ','ПАУЗА ПІСЛЯ ВИДИХУ'][frame.phase];
+  if(caption&&caption.textContent!==label)caption.textContent=label;
+ }
  bind(){
  this.abort=new AbortController();const opts={signal:this.abort.signal};
+ this.root.addEventListener('atlas:breath-frame',e=>this.updateBreathDrawing(e.detail),opts);
+ const visibility=()=>this.root.classList.toggle('atlas-document-hidden',document.hidden);
+ document.addEventListener('visibilitychange',visibility,opts);visibility();
+ const p=window.breathPacer;if(p.activeEl===this.root)p.updateDOM(p.elapsed+(p.isRunning?performance.now()-p.anchor:0));
  this.root.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
  if(b.dataset.plate){this.view=b.dataset.plate;this.updatePlate();}
  else if(b.dataset.zone!==undefined)this.selectZone(Number(b.dataset.zone));
  else if(b.dataset.mode){this.mode=b.dataset.mode;this.updateMode();}
  else if(b.dataset.zoom!==undefined){Number(b.dataset.zoom)===0?this.resetZoom():this.changeZoom(Number(b.dataset.zoom)*.25);}
  else if(b.hasAttribute('data-labels')){this.labels=!this.labels;this.root.classList.toggle('hide-labels',!this.labels);b.setAttribute('aria-pressed',String(this.labels));}
- else if(b.hasAttribute('data-motion')){this.motion=!this.motion;this.root.classList.toggle('atlas-motion-paused',!this.motion);b.textContent=`Рух схеми: ${this.motion?'увімкнено':'вимкнено'}`;b.setAttribute('aria-pressed',String(this.motion));}
+ else if(b.hasAttribute('data-motion')){this.motion=!this.motion;this.root.classList.toggle('atlas-motion-paused',!this.motion);b.textContent=`Рух схеми: ${this.motion?'увімкнено':'вимкнено'}`;b.setAttribute('aria-pressed',String(this.motion));if(this.lastBreathFrame)this.updateBreathDrawing(this.lastBreathFrame);}
  else if(b.hasAttribute('data-expand'))this.setExpanded(!this.root.classList.contains('atlas-expanded'));
  else if(b.hasAttribute('data-pacer-toggle'))window.breathPacer.toggle(this.root);
  else if(b.hasAttribute('data-pacer-reset'))window.breathPacer.reset();},opts);
