@@ -11,8 +11,12 @@ grant usage on schema auth to authenticated;grant execute on all functions in sc
 for(const name of fs.readdirSync('supabase/migrations').filter(n=>n.endsWith('.sql')).sort())await db.exec(fs.readFileSync('supabase/migrations/'+name,'utf8'));return db;}
 async function seed(db){await db.exec(`insert into auth.users(id,email,email_confirmed_at) values('${A}','a@example.test',now()),('${B}','b@example.test',now()),('${C}','c@example.test',now());
 insert into auth.sessions(id,user_id) values('${SA}','${A}'),('${SB}','${B}'),('${SC}','${C}');
-insert into tv_core.orders(id,provider,reference,buyer_email,product_id,amount_minor,currency,status,verified_at) values('o-a','test','a','a@example.test','mini-base',1500,'USD','approved',now()),('o-b','test','b','b@example.test','mini-base',1500,'USD','approved',now());
-insert into tv_core.entitlements(order_id,resource_key,user_id) values('o-a','atlas',null),('o-b','atlas','${B}');`);}
+insert into tv_core.orders(id,provider,reference,buyer_email,product_id,amount_minor,currency,status,verified_at,purchased_at,status_observed_at) values
+('o-a','test','a','a@example.test','mini-base',1500,'USD','approved',now(),now()-interval '10 days',now()),
+('o-b','test','b','b@example.test','mini-base',1500,'USD','approved',now(),now()-interval '10 days',now());
+insert into tv_core.entitlements(order_id,resource_key,user_id,valid_from,valid_until) values
+('o-a','atlas',null,now()-interval '10 days',now()+interval '200 days'),
+('o-b','atlas','${B}',now()-interval '10 days',now()+interval '200 days');`);}
 async function claims(db,id,session){await db.exec('reset role');await db.query("select set_config('request.jwt.claims',$1,false)",[JSON.stringify({sub:id,session_id:session,exp:Math.floor(Date.now()/1000)+3600})]);await db.exec('set role authenticated');}
 const scalar=async(db,sql,args=[])=>(await db.query(sql,args)).rows[0];
 module.exports={fixture,seed,claims,scalar,A,B,C,SA,SB,SC};
