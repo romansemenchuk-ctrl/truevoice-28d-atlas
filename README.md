@@ -19,6 +19,8 @@ Member APIs use Supabase SSR/Auth and the public publishable key. Auth cookies a
 
 Payment operations are isolated in a separate server-only worker. `SUPABASE_SERVICE_ROLE_KEY`, WayForPay credentials, the bridge secret and cron secret are never sent to the browser. The landing bridge authenticates server-to-server with `ATLAS_PAYMENT_BRIDGE_SECRET`; signed WayForPay callbacks are only a trigger for re-verification, never a source of buyer ownership. Buyer email/product/amount/currency are registered from the trusted checkout path before the payment widget is returned.
 
+Protected Vercel Preview transport prefers Vercel Trusted Sources OIDC: the landing Function forwards its short-lived Vercel OIDC token and Atlas Deployment Protection validates the authorized project/environment rule. A long-lived Protection Bypass for Automation secret remains supported only as a fallback. The application-level Academy bridge bearer is still required independently of Vercel deployment protection.
+
 `tv_core` stays outside the exposed Data API schemas. Narrow RPCs are used for member state; service-role-only RPCs handle payment/admin operations. All application tables retain RLS. Admin operations require the authenticated admin actor and write audit metadata.
 
 ## Payments and reconciliation
@@ -30,6 +32,8 @@ Historical import is `preview → digest → re-fetch → commit`. Preview windo
 A daily Vercel cron calls `/api/reconcile` at `03:17 UTC`. Each candidate is rechecked with WayForPay `CHECK_STATUS`; provider/network/signature failure preserves the last verified financial/access state.
 
 Synthetic QA uses exactly seven deterministic `provider=test` payment scenarios and never creates Auth users. Cleanup removes only `provider=test` rows and preserves WayForPay/customer rows.
+
+The server bridge also exposes GET `action=bridge-health`. It verifies the app-level bridge bearer and returns `{ok:true}` before payment worker, Supabase service client or WayForPay initialization. This gives the rollout a zero-write connectivity test before any order/provider action.
 
 ## Member experience
 
@@ -54,14 +58,14 @@ npm audit
 
 Latest verified CI baseline on `feat/academy-access-wayforpay-20260910`:
 
-- unit/SQL: 78 passing, 0 failing
+- unit/SQL: 80 passing, 0 failing
 - member browser: 14/14
 - mechanics browser: 9/9
 - `npm audit --omit=dev`: 0 vulnerabilities
 - full `npm audit`: 0 vulnerabilities
 - `git diff --check`: pass
 
-Landing bridge branch `feat/academy-ledger-bridge-20260910`: callback 9/9, order-create 4/4, preview-health 4/4, diff check pass.
+Landing bridge branch `feat/academy-ledger-bridge-20260910`: callback 10/10, order-create 6/6, preview-health/zero-write probe 5/5, diff check pass. Landing prefers Vercel Trusted Sources OIDC and retains Protection Bypass only as fallback.
 
 Cloud verification has exercised the seven synthetic payment states, `approved → review → stale approved`, fresh Approved re-verification after review, and audited classification of an unclassified historical review. Every verification used scoped `provider=test` data and cleaned it before commit. No synthetic Auth users or test payment rows remain; WayForPay rows remain untouched.
 
@@ -90,6 +94,8 @@ All values after `TURNSTILE_SITE_KEY` are server-only secrets. Never commit real
 
 The landing integration is separately gated by `ACADEMY_LEDGER_MODE=off|shadow|required`. `off` makes no Academy request; `shadow` records/logs bridge failures without changing current checkout behavior; `required` is the eventual fail-closed production mode and must not be enabled until the full rollout gates pass.
 
+For the preferred protected-preview path, configure Vercel Trusted Sources on the Atlas project to allow `truevoice-landing` Preview → Atlas Preview. The landing code automatically forwards its Vercel OIDC token, so no long-lived deployment-protection bypass secret is required. `ACADEMY_LEDGER_VERCEL_BYPASS` is supported only as a fallback if Trusted Sources cannot be used.
+
 ## Build/deployment safety
 
 Do not serve the repository root publicly; source lessons and `_server` are intentionally outside `dist`. A generic static host cannot implement Academy authorization. The build output and protected asset paths contain no service-role or WayForPay secret values.
@@ -99,7 +105,7 @@ The repository is currently public and earlier Atlas material was historically p
 ## Remaining launch gates
 
 1. Configure the Atlas Vercel Preview server-only service-role / WayForPay / bridge / cron values while keeping `ATLAS_EMAIL_ENABLED=false`, then re-read preview health and verify payment/admin fail-closed paths.
-2. Configure landing Preview ledger URL/secret, switch only the feature preview to `shadow`, and verify current checkout behavior remains unaffected by bridge failure/success without charging a card.
+2. Configure Atlas Deployment Protection → Trusted Sources for `truevoice-landing` Preview → Atlas Preview; configure landing Preview ledger URL/secret, switch only the feature preview to `shadow`, and require the zero-write bridge probe to report reachable before any order/provider operation. Use Protection Bypass only as fallback.
 3. Review historical WayForPay preview windows. No historical commit without owner review of review/conflict/access dates.
 4. Configure custom SMTP/OTP/CAPTCHA and prove real login for the explicit owner admin identity.
 5. Real purchase and refund tests require explicit approval immediately before any spend/provider action.
