@@ -49,7 +49,7 @@ function createHandler({config,clientFactory=clientFor,courseLoader,artLoader}={
     for(const item of cookies(req).filter(x=>x.name.startsWith(c.local?'tv-auth':'__Host-tv-auth')))appendCookie(res,serializeCookieHeader(item.name,'',{path:'/',maxAge:0,httpOnly:true,secure:!c.local,sameSite:'lax'}));return send(200,{ok:true});
    }
    const {data,error}=await client.auth.getUser();if(error||!data?.user?.id||!data.user.email_confirmed_at)fail(401,'login_required');
-   const account=await rpc(client,action==='session'?'tv_account':'tv_authorize');
+   const account=await rpc(client,(action==='session'||action==='profile')?'tv_account':'tv_authorize');
    if(action==='session')return send(200,{...account,csrf:csrf(req,res,c)});
    if(action==='content'||action==='admin-content'){
     if(action==='admin-content'&&account.user.role!=='admin')fail(403,'admin_required');
