@@ -1,4 +1,4 @@
-import {mkdir,readFile,writeFile,cp,rm} from 'node:fs/promises';
+import {mkdir,readFile,writeFile,cp,rm,access} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
@@ -16,7 +16,6 @@ const context={window:{}};vm.runInNewContext(await readFile(path.join(root,'js',
 if(context.window.LESSONS_DATA.length!==28)throw Error('Expected 28 source lessons');
 await writeFile(path.join(privateOut,'course.json'),JSON.stringify({weeks:context.window.WEEKS_DATA,lessons:context.window.LESSONS_DATA}));
 for(const key of ['tract','breath','larynx','body']){const a=pack[key],b=Buffer.from(a.base64,'base64');if(a.width!==1122||a.height!==1402||hash(b)!==a.sha256||b.toString('ascii',8,12)!=='WEBP')throw Error('Invalid image '+key);await writeFile(path.join(privateOut,'anatomy',key+'.webp'),b);}
-// Version-checked compatibility transforms keep the original lesson content and controller intact.
 async function replaceIn(file,from,to){const p=path.join(out,file),s=await readFile(p,'utf8');if(!s.includes(from))throw Error('Compatibility contract missing: '+file);await writeFile(p,s.replaceAll(from,to));}
 await replaceIn('js/modules/anatomy-viewer.js','`assets/anatomy/${this.view}.webp`','`/api/academy?action=art&key=${this.view}`');
 await replaceIn('js/modules/voice-recorder.js',"indexedDB.open('TrueVoiceRecordings',1)","indexedDB.open('TrueVoiceRecordings:'+window.ATLAS_MEMBER.id,1)");
@@ -29,6 +28,7 @@ let html=await readFile(path.join(root,'index.html'),'utf8');html=html.replace(/
 const extra=['atlas-upgrade.css','accessibility.css','academy.css','academy-interaction.css','mechanics.css'].map(f=>`<link rel="stylesheet" href="css/${f}">`).join('\n');
 html=html.replace('</head>',extra+'\n</head>').replace('<body>','<body>\n'+await readFile(path.join(root,'academy-shell.html'),'utf8')).replace('</body>','<script src="js/academy.js"></script>\n</body>');
 for(const m of [...html.matchAll(/(?:src|href)="((?:css|js)\/[^"?]+\.(?:js|css))"/g)])html=html.replaceAll(`"${m[1]}"`,`"${m[1]}?v=${hash(await readFile(path.join(out,m[1]))).slice(0,12)}"`);
+await access(path.join(out,'js','academy-admin.js'));
 await writeFile(path.join(out,'index.html'),html);
-await writeFile(path.join(out,'version.json'),JSON.stringify({version:'4.0.0-core',course:'28 original lessons preserved server-side',auth:'Supabase; purchase-gated; no browser service-role key',artworkSha256:expected},null,2));
-console.log('Built Academy Core: private lessons/art in _server, public sign-in shell in dist.');
+await writeFile(path.join(out,'version.json'),JSON.stringify({version:'4.1.0-academy',course:'28 original lessons preserved server-side',auth:'Supabase account shell; entitlement-gated Atlas',admin:'server-authorized; student view default',artworkSha256:expected},null,2));
+console.log('Built Academy 4.1: account-first shell, lazy protected Atlas, separate admin module.');
