@@ -6,7 +6,7 @@ Branches:
 - Atlas: `feat/academy-access-wayforpay-20260910`
 - Landing: `feat/academy-ledger-bridge-20260910`
 
-This document records synthetic/local/CI verification only. It does not claim real OTP delivery, physical-device certification, a real WayForPay purchase/refund, historical customer import or production rollout.
+This document records automated local/CI verification plus the explicitly described cloud database verification below. It does not claim real OTP delivery, physical-device certification, a real WayForPay purchase/refund, historical customer import or production rollout.
 
 ## Verified Atlas baseline
 
@@ -33,6 +33,8 @@ Result:
 - diff check: pass
 
 The browser suite used Playwright 1.63.0 / Chromium in GitHub Actions. The browser harness is localhost-only with synthetic identities and PGlite; it did not connect to Supabase or real customer data.
+
+The documentation-only current head `af0e7960d2597d3d1f6da5ee81c5f54f42dc01ed` also completed `Academy Feature CI` successfully in run `34434095395`.
 
 ## Verified access-policy behavior
 
@@ -155,18 +157,53 @@ Verified rollout contracts:
 - registration uses server-validated email/product/catalog price/reference
 - provider-event bridge body never forwards callback buyer email
 
+## Cloud database verification
+
+Project: True Voice Academy (`aqskidnelqmowzfkjieg`). No live checkout mode was changed during these database checks.
+
+Applied additive migrations in order:
+
+```text
+academy_access_policy_and_payment_state_v1
+academy_account_without_entitlement_v1
+academy_admin_payment_operations_v1
+academy_qa_cleanup_v1
+```
+
+Read-back after migration proved:
+- all 11 `tv_core` application tables have RLS enabled
+- anonymous role has no executable `public.tv_*` RPC
+- authenticated role is limited to member RPCs: `tv_account`, `tv_authorize`, `tv_save_lesson`, `tv_save_profile`, `tv_set_resume`
+- payment/admin RPCs are executable by `service_role`, not by ordinary authenticated/anonymous callers
+- `mini-base`: Atlas / duration / 210 days
+- `mini-pro`: Atlas / duration / 210 days
+- `atlas-28d`: Atlas / lifetime
+- `mini-upgrade`: no resource grant
+- the confirmed owner identity `ceo@truevoice.academy` has the explicit `admin` role
+
+A controlled verification migration `verify_academy_qa_lifecycle_20260910` then exercised the production database RPCs with the same seven `provider=test` scenarios. Assertions covered active Mini, expired Mini, lifetime Atlas, refund, chargeback and review/no-entitlement. The same migration invoked the official QA cleanup function. Post-cleanup read-back proved:
+- test orders: 0
+- test payment events: 0
+- test entitlements: 0
+- synthetic `@example.test` Auth users: 0
+- WayForPay orders unchanged
+- audit trail recorded `qa_seed` count 7 and `qa_cleanup` count: 7 orders / 16 events / 6 entitlements
+
+The management SQL connector itself is read-only and could not execute service-role RPCs; the controlled migration was used specifically so the verification ran with migration privileges while preserving the service-role boundary. No runtime permission was widened.
+
+## Preview status
+
+Vercel has a READY deployment for the current Atlas branch SHA and its Academy health endpoint reports Supabase configured with `emailEnabled=false`. The preview remains protected by Vercel Authentication. The current connector cannot read or modify project environment variables, so service-role/WayForPay/bridge/cron secret presence has not been asserted from the deployment and no payment provider action has been attempted.
+
 ## Remaining live gates
 
 Not verified by this document:
-- cloud application of migrations `2026091001–1004`
-- cloud read-back of RLS/RPC grants/product durations
-- cloud QA seed/cleanup
-- Vercel preview with real server-only secrets
+- Vercel preview service-role / WayForPay / bridge / cron secret configuration
+- authenticated admin payment API on the protected preview
 - landing preview in `shadow` against the Atlas preview
 - historical WayForPay preview against real transaction history
 - custom SMTP / OTP template / CAPTCHA / Auth rate-limit configuration
 - real OTP to `ceo@truevoice.academy`
-- explicit live admin-role assignment after confirmed Auth identity
 - real purchase flow
 - real refund flow
 - physical iPhone/Safari
