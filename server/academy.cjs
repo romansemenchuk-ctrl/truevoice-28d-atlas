@@ -1,6 +1,7 @@
 'use strict';
 const fs=require('node:fs/promises'),path=require('node:path'),crypto=require('node:crypto');
 const {clientFor,configFromEnv,appendCookie,cookies,serializeCookieHeader}=require('./supabase.cjs');
+const {demoAccount}=require('./demo-preview.cjs');
 const METHODS={health:'GET',session:'GET',content:'GET','admin-content':'GET',art:'GET',profile:'POST',resume:'POST',lesson:'POST',logout:'POST','request-code':'POST','verify-code':'POST'};
 const fail=(status,code)=>{const e=new Error(code);e.status=status;throw e;};
 const same=(a,b)=>{const x=Buffer.from(String(a||'')),y=Buffer.from(String(b||''));return x.length===y.length&&crypto.timingSafeEqual(x,y);};
@@ -32,6 +33,29 @@ function createHandler({config,clientFactory=clientFor,courseLoader,artLoader,ru
   try{
    const c=config||configFromEnv(),url=new URL(req.url,'https://invalid.local'),action=url.searchParams.get('action')||'session';
    if(!Object.hasOwn(METHODS,action))fail(404,'not_found');if(req.method!==METHODS[action]){res.setHeader('Allow',METHODS[action]);fail(405,'method_not_allowed');}
+   const demo=url.searchParams.get('demo')==='1';
+   if(demo&&runtimeEnv?.VERCEL_ENV!=='preview')fail(404,'not_found');
+   if(demo&&action!=='health'){
+    if(action==='session')return send(200,demoAccount());
+    if(action==='content'||action==='admin-content'){
+     const course=courseLoader?await courseLoader():JSON.parse(await fs.readFile(path.join(process.cwd(),'_server','course.json'),'utf8'));
+     return send(200,action==='admin-content'?{lessons:course.lessons.map(l=>({w:l.w,n:l.n,pain:l.pain||''}))}:{weeks:course.weeks,lessons:course.lessons.map(pickLesson)});
+    }
+    if(action==='art'){
+     const key=url.searchParams.get('key');if(!['tract','breath','larynx','body'].includes(key))fail(404,'not_found');
+     const image=artLoader?await artLoader(key):await fs.readFile(path.join(process.cwd(),'_server','anatomy',key+'.webp'));res.setHeader('Content-Type','image/webp');res.status(200);return res.end(image);
+    }
+    if(action==='request-code'||action==='verify-code')fail(404,'not_found');
+    const b=await readBody(req);
+    if(action==='logout')return send(200,{ok:true});
+    if(action==='profile')return send(200,{name:String(b.name||'').trim().slice(0,80),lastLesson:String(b.lastLesson||'1-1')});
+    if(action==='resume')return send(200,{lastLesson:String(b.lesson||'1-1')});
+    if(action==='lesson'){
+     if(!/^[1-4]-[1-7]$/.test(String(b.lesson||''))||!Number.isInteger(b.version)||b.version<0||!b.data||typeof b.data!=='object')fail(400,'invalid_data');
+     return send(200,{lesson_key:b.lesson,version:b.version+1,completed:b.data.completed===true,steps:Array.isArray(b.data.steps)?b.data.steps:[],notes:String(b.data.notes||'').slice(0,30000),bookmarked:b.data.bookmarked===true});
+    }
+    fail(404,'not_found');
+   }
    if(action==='health'){
     const bundleReady=await fs.access(path.join(process.cwd(),'_server','course.json')).then(()=>true,()=>false);
     const body={version:'4.1.0-core',configured:!!c.key,bundleReady,emailEnabled:c.emailEnabled&&!!c.captchaSiteKey,captchaSiteKey:c.captchaSiteKey};
