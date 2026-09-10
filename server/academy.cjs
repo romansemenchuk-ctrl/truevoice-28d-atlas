@@ -13,7 +13,7 @@ async function readBody(req){
  if(!b||typeof b!=='object'||Array.isArray(b))fail(400,'invalid_json');if(Buffer.byteLength(JSON.stringify(b))>131072)fail(413,'body_too_large');return b;
 }
 function email(value){const s=String(value||'').trim().toLowerCase();if(s.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s))fail(400,'invalid_email');return s;}
-async function rpc(client,name,args){const {data,error}=await client.rpc(name,args);if(error){if(error.code==='42501')fail(403,'purchase_required');if(error.code==='22023')fail(400,'invalid_data');fail(503,'database_unavailable');}return data;}
+async function rpc(client,name,args){const {data,error}=await client.rpc(name,args);if(error){if(error.code==='42501')fail(name==='tv_account'?401:403,name==='tv_account'?'login_required':'purchase_required');if(error.code==='22023')fail(400,'invalid_data');fail(503,'database_unavailable');}return data;}
 function csrf(req,res,c){const name=c.local?'tv-csrf':'__Host-tv-csrf';let token=cookies(req).find(x=>x.name===name)?.value;
  if(!/^[a-f0-9]{64}$/.test(token||'')){token=crypto.randomBytes(32).toString('hex');appendCookie(res,serializeCookieHeader(name,token,{path:'/',httpOnly:true,secure:!c.local,sameSite:'strict',maxAge:43200}));}return token;}
 function mutationGuard(req,c){
