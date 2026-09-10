@@ -1,10 +1,15 @@
 'use strict';
 const fs=require('node:fs/promises'),path=require('node:path'),crypto=require('node:crypto');
 const {clientFor,configFromEnv,appendCookie,cookies,serializeCookieHeader}=require('./supabase.cjs');
+const {demoAccount}=require('./demo-preview.cjs');
 const METHODS={health:'GET',session:'GET',content:'GET','admin-content':'GET',art:'GET',profile:'POST',resume:'POST',lesson:'POST',logout:'POST','request-code':'POST','verify-code':'POST'};
 const fail=(status,code)=>{const e=new Error(code);e.status=status;throw e;};
 const same=(a,b)=>{const x=Buffer.from(String(a||'')),y=Buffer.from(String(b||''));return x.length===y.length&&crypto.timingSafeEqual(x,y);};
 const pickLesson=l=>Object.fromEntries(['w','n','title','sense','theory','practice','hw','s','sound'].filter(k=>l[k]!==undefined).map(k=>[k,l[k]]));
+function runtimeCapabilities(env,c){
+ const serviceKey=String(env?.SUPABASE_SERVICE_ROLE_KEY||''),merchant=String(env?.WAYFORPAY_MERCHANT_ACCOUNT||''),waySecret=String(env?.WAYFORPAY_SECRET_KEY||''),bridge=String(env?.ATLAS_PAYMENT_BRIDGE_SECRET||''),cron=String(env?.CRON_SECRET||'');
+ return{serviceRoleConfigured:!!c.url&&!!serviceKey,wayForPayConfigured:!!merchant&&!!waySecret,bridgeConfigured:bridge.length>=32,cronConfigured:cron.length>=32};
+}
 async function readBody(req){
  let b=req.body;
  if(b===undefined){let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>131072)fail(413,'body_too_large');}b=raw;}
@@ -13,7 +18,7 @@ async function readBody(req){
  if(!b||typeof b!=='object'||Array.isArray(b))fail(400,'invalid_json');if(Buffer.byteLength(JSON.stringify(b))>131072)fail(413,'body_too_large');return b;
 }
 function email(value){const s=String(value||'').trim().toLowerCase();if(s.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s))fail(400,'invalid_email');return s;}
-async function rpc(client,name,args){const {data,error}=await client.rpc(name,args);if(error){if(error.code==='42501')fail(403,'purchase_required');if(error.code==='22023')fail(400,'invalid_data');fail(503,'database_unavailable');}return data;}
+async function rpc(client,name,args){const {data,error}=await client.rpc(name,args);if(error){if(error.code==='42501')fail(name==='tv_account'?401:403,name==='tv_account'?'login_required':'purchase_required');if(error.code==='22023')fail(400,'invalid_data');fail(503,'database_unavailable');}return data;}
 function csrf(req,res,c){const name=c.local?'tv-csrf':'__Host-tv-csrf';let token=cookies(req).find(x=>x.name===name)?.value;
  if(!/^[a-f0-9]{64}$/.test(token||'')){token=crypto.randomBytes(32).toString('hex');appendCookie(res,serializeCookieHeader(name,token,{path:'/',httpOnly:true,secure:!c.local,sameSite:'strict',maxAge:43200}));}return token;}
 function mutationGuard(req,c){
@@ -22,13 +27,42 @@ function mutationGuard(req,c){
  const token=cookies(req).find(x=>x.name===(c.local?'tv-csrf':'__Host-tv-csrf'))?.value;
  if(!/^[a-f0-9]{64}$/.test(token||'')||!same(token,req.headers['x-csrf-token']))fail(403,'csrf_required');
 }
-function createHandler({config,clientFactory=clientFor,courseLoader,artLoader}={}){
+function createHandler({config,clientFactory=clientFor,courseLoader,artLoader,runtimeEnv=process.env}={}){
  return async(req,res)=>{
   res.setHeader('Cache-Control','private, no-store, max-age=0');res.setHeader('Vary','Cookie');res.setHeader('X-Content-Type-Options','nosniff');const send=(n,data)=>res.status(n).json(data);
   try{
    const c=config||configFromEnv(),url=new URL(req.url,'https://invalid.local'),action=url.searchParams.get('action')||'session';
    if(!Object.hasOwn(METHODS,action))fail(404,'not_found');if(req.method!==METHODS[action]){res.setHeader('Allow',METHODS[action]);fail(405,'method_not_allowed');}
-   if(action==='health'){const bundleReady=await fs.access(path.join(process.cwd(),'_server','course.json')).then(()=>true,()=>false);return send(200,{version:'4.0.0-core',configured:!!c.key,bundleReady,emailEnabled:c.emailEnabled&&!!c.captchaSiteKey,captchaSiteKey:c.captchaSiteKey,csrf:csrf(req,res,c)});}
+   const demo=url.searchParams.get('demo')==='1';
+   if(demo&&runtimeEnv?.VERCEL_ENV!=='preview')fail(404,'not_found');
+   if(demo&&action!=='health'){
+    if(action==='session')return send(200,demoAccount());
+    if(action==='content'||action==='admin-content'){
+     const course=courseLoader?await courseLoader():JSON.parse(await fs.readFile(path.join(process.cwd(),'_server','course.json'),'utf8'));
+     return send(200,action==='admin-content'?{lessons:course.lessons.map(l=>({w:l.w,n:l.n,pain:l.pain||''}))}:{weeks:course.weeks,lessons:course.lessons.map(pickLesson)});
+    }
+    if(action==='art'){
+     const key=url.searchParams.get('key');if(!['tract','breath','larynx','body'].includes(key))fail(404,'not_found');
+     const image=artLoader?await artLoader(key):await fs.readFile(path.join(process.cwd(),'_server','anatomy',key+'.webp'));res.setHeader('Content-Type','image/webp');res.status(200);return res.end(image);
+    }
+    if(action==='request-code'||action==='verify-code')fail(404,'not_found');
+    const b=await readBody(req);
+    if(action==='logout')return send(200,{ok:true});
+    if(action==='profile')return send(200,{name:String(b.name||'').trim().slice(0,80),lastLesson:String(b.lastLesson||'1-1')});
+    if(action==='resume')return send(200,{lastLesson:String(b.lesson||'1-1')});
+    if(action==='lesson'){
+     if(!/^[1-4]-[1-7]$/.test(String(b.lesson||''))||!Number.isInteger(b.version)||b.version<0||!b.data||typeof b.data!=='object')fail(400,'invalid_data');
+     return send(200,{lesson_key:b.lesson,version:b.version+1,completed:b.data.completed===true,steps:Array.isArray(b.data.steps)?b.data.steps:[],notes:String(b.data.notes||'').slice(0,30000),bookmarked:b.data.bookmarked===true});
+    }
+    fail(404,'not_found');
+   }
+   if(action==='health'){
+    const bundleReady=await fs.access(path.join(process.cwd(),'_server','course.json')).then(()=>true,()=>false);
+    const body={version:'4.1.0-core',configured:!!c.key,bundleReady,emailEnabled:c.emailEnabled&&!!c.captchaSiteKey,captchaSiteKey:c.captchaSiteKey};
+    if(runtimeEnv?.VERCEL_ENV!=='production')body.capabilities=runtimeCapabilities(runtimeEnv,c);
+    body.csrf=csrf(req,res,c);
+    return send(200,body);
+   }
    if(req.method!=='GET')mutationGuard(req,c);if(!c.key||!c.url)fail(503,'setup_required');
    const b=req.method!=='GET'?await readBody(req):null,client=clientFactory(req,res,c);
    if(action==='request-code'||action==='verify-code'){
@@ -37,7 +71,7 @@ function createHandler({config,clientFactory=clientFor,courseLoader,artLoader}={
      if(typeof b.captchaToken!=='string'||!b.captchaToken||b.captchaToken.length>4096)fail(400,'captcha_required');
      const {error}=await client.auth.signInWithOtp({email:address,options:{shouldCreateUser:true,captchaToken:b.captchaToken}});
      if(error?.status===429)fail(429,'rate_limited');if(error&&error.status>=500)fail(503,'email_unavailable');
-     return send(202,{message:'Перевір пошту. Доступ до кабінету відкриється лише за наявності покупки.'});
+     return send(202,{message:'Перевір пошту. Доступ до кабінету відкривається лише за підтвердженою покупкою.'});
     }
     if(!/^\d{6,10}$/.test(String(b.code||'')))fail(400,'invalid_code');
     const {data,error}=await client.auth.verifyOtp({email:address,token:String(b.code),type:'email'});
@@ -49,7 +83,7 @@ function createHandler({config,clientFactory=clientFor,courseLoader,artLoader}={
     for(const item of cookies(req).filter(x=>x.name.startsWith(c.local?'tv-auth':'__Host-tv-auth')))appendCookie(res,serializeCookieHeader(item.name,'',{path:'/',maxAge:0,httpOnly:true,secure:!c.local,sameSite:'lax'}));return send(200,{ok:true});
    }
    const {data,error}=await client.auth.getUser();if(error||!data?.user?.id||!data.user.email_confirmed_at)fail(401,'login_required');
-   const account=await rpc(client,action==='session'?'tv_account':'tv_authorize');
+   const account=await rpc(client,(action==='session'||action==='profile')?'tv_account':'tv_authorize');
    if(action==='session')return send(200,{...account,csrf:csrf(req,res,c)});
    if(action==='content'||action==='admin-content'){
     if(action==='admin-content'&&account.user.role!=='admin')fail(403,'admin_required');
@@ -72,4 +106,4 @@ function createHandler({config,clientFactory=clientFor,courseLoader,artLoader}={
   }catch(e){if(!e.status)console.error('Academy request failed:',e.name);return send(e.status||500,{error:e.status?e.message:'server_error'});}
  };
 }
-module.exports={createHandler,pickLesson,readBody,mutationGuard};
+module.exports={createHandler,pickLesson,readBody,mutationGuard,runtimeCapabilities};
