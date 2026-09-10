@@ -10,7 +10,7 @@ This document records automated local/CI verification plus the explicitly descri
 
 ## Verified Atlas baseline
 
-Reference CI run: GitHub Actions `Academy Feature CI` run `34433931844`, head `229e0794e47d4cd7656a6a944b8fc81b1d7a101e`.
+Reference current PR CI run: GitHub Actions `Academy Feature CI` run `34435580858`, head `28ffd3d64e9b739c2dcc02deedd707a6ad2300ba`.
 
 Commands executed from a clean checkout:
 
@@ -25,7 +25,7 @@ git diff --check 7c2c25ae693f1f04d84df85f446a34600fe861d4 HEAD
 
 Result:
 - clean `npm ci`: pass
-- unit/SQL: 70 passing, 0 failing
+- unit/SQL: 72 passing, 0 failing
 - member browser: 14/14
 - mechanics browser: 9/9
 - production dependency audit: 0 vulnerabilities
@@ -33,8 +33,6 @@ Result:
 - diff check: pass
 
 The browser suite used Playwright 1.63.0 / Chromium in GitHub Actions. The browser harness is localhost-only with synthetic identities and PGlite; it did not connect to Supabase or real customer data.
-
-The documentation-only current head `af0e7960d2597d3d1f6da5ee81c5f54f42dc01ed` also completed `Academy Feature CI` successfully in run `34434095395`.
 
 ## Verified access-policy behavior
 
@@ -50,6 +48,8 @@ Automated SQL/RLS tests prove:
 - user B cannot read user A state through RLS or member RPCs
 - refund keeps account identity but revokes Atlas
 - terminal refund cannot be resurrected by an older replayed Approved event
+- a newer verified `review` suspends an existing Approved payment/access state
+- an older/equal Approved replay cannot clear that newer review quarantine
 - anonymous and ordinary student access to internal/admin content remains denied
 
 ## Verified payment-worker behavior
@@ -60,7 +60,9 @@ Automated tests prove:
 - trusted order registration uses server-supplied checkout ownership facts
 - callback/provider-event payload cannot set buyer ownership email
 - signed callback is a trigger for `CHECK_STATUS`, not the source of ownership
-- amount/currency mismatch becomes `review` and cannot grant access
+- amount/currency mismatch becomes `review` and cannot grant/retain access
+- review is a quarantine state; stale Approved replay cannot silently restore it
+- only a strictly newer verified Approved observation may resolve review; terminal refund/chargeback still take precedence
 - provider signature/reference verification fails closed
 - event keys are deterministic/idempotent
 - admin registry can render without WayForPay credentials; provider verification still fails closed when provider credentials are absent
@@ -161,16 +163,17 @@ Verified rollout contracts:
 
 Project: True Voice Academy (`aqskidnelqmowzfkjieg`). No live checkout mode was changed during these database checks.
 
-Applied additive migrations in order:
+Applied additive schema/behavior migrations in order:
 
 ```text
 academy_access_policy_and_payment_state_v1
 academy_account_without_entitlement_v1
 academy_admin_payment_operations_v1
 academy_qa_cleanup_v1
+academy_review_quarantine_v1
 ```
 
-Read-back after migration proved:
+Read-back proved:
 - all 11 `tv_core` application tables have RLS enabled
 - anonymous role has no executable `public.tv_*` RPC
 - authenticated role is limited to member RPCs: `tv_account`, `tv_authorize`, `tv_save_lesson`, `tv_save_profile`, `tv_set_resume`
@@ -181,7 +184,7 @@ Read-back after migration proved:
 - `mini-upgrade`: no resource grant
 - the confirmed owner identity `ceo@truevoice.academy` has the explicit `admin` role
 
-A controlled verification migration `verify_academy_qa_lifecycle_20260910` then exercised the production database RPCs with the same seven `provider=test` scenarios. Assertions covered active Mini, expired Mini, lifetime Atlas, refund, chargeback and review/no-entitlement. The same migration invoked the official QA cleanup function. Post-cleanup read-back proved:
+Controlled verification migration `verify_academy_qa_lifecycle_20260910` exercised the production database RPCs with the seven `provider=test` scenarios. Assertions covered active Mini, expired Mini, lifetime Atlas, refund, chargeback and review/no-entitlement. It then invoked the official QA cleanup function. Post-cleanup read-back proved:
 - test orders: 0
 - test payment events: 0
 - test entitlements: 0
@@ -189,11 +192,21 @@ A controlled verification migration `verify_academy_qa_lifecycle_20260910` then 
 - WayForPay orders unchanged
 - audit trail recorded `qa_seed` count 7 and `qa_cleanup` count: 7 orders / 16 events / 6 entitlements
 
-The management SQL connector itself is read-only and could not execute service-role RPCs; the controlled migration was used specifically so the verification ran with migration privileges while preserving the service-role boundary. No runtime permission was widened.
+A second controlled verification migration, `verify_academy_review_quarantine_20260910`, exercised the regression found during PR review:
+
+```text
+approved -> newer review -> stale older approved replay
+```
+
+Assertions proved the order remained `review` after the stale Approved replay. Scoped cleanup then removed exactly 1 test order / 4 test events / 1 entitlement. Final read-back again showed zero `provider=test` rows, zero synthetic Auth users and unchanged WayForPay rows. `tv_apply_payment_status` remained executable by `service_role` only, not anon/authenticated.
+
+The management SQL connector itself is read-only and could not execute service-role RPCs; controlled verification migrations were used so the checks ran with migration privileges while preserving runtime role boundaries. No runtime permission was widened.
+
+One-shot verification SQL is tracked separately under `supabase/verification/` and is explicitly marked historical/non-replayable so cloud migration history remains auditable without treating QA scripts as normal schema migrations.
 
 ## Preview status
 
-Vercel has a READY deployment for the current Atlas branch SHA and its Academy health endpoint reports Supabase configured with `emailEnabled=false`. The preview remains protected by Vercel Authentication. The current connector cannot read or modify project environment variables, so service-role/WayForPay/bridge/cron secret presence has not been asserted from the deployment and no payment provider action has been attempted.
+Vercel has READY deployments for the Atlas feature branch and landing bridge branch. The Atlas Academy health endpoint has reported Supabase configured with `emailEnabled=false`. The previews remain protected by Vercel Authentication. The current Vercel connector cannot read or modify project environment variables, so service-role/WayForPay/bridge/cron secret presence has not been asserted from the deployment and no payment provider action has been attempted.
 
 ## Remaining live gates
 
