@@ -23,11 +23,6 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - name: Refresh QA lockfile for Playwright upgrade
-        run: |
-          npm install --package-lock-only --ignore-scripts
-          echo "PLAYWRIGHT_INTEGRITY=$(npm view playwright@1.63.0 dist.integrity)"
-          echo "PLAYWRIGHT_CORE_INTEGRITY=$(npm view playwright-core@1.63.0 dist.integrity)"
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run test:all
