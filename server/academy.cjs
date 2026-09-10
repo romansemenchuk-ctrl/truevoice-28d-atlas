@@ -5,6 +5,10 @@ const METHODS={health:'GET',session:'GET',content:'GET','admin-content':'GET',ar
 const fail=(status,code)=>{const e=new Error(code);e.status=status;throw e;};
 const same=(a,b)=>{const x=Buffer.from(String(a||'')),y=Buffer.from(String(b||''));return x.length===y.length&&crypto.timingSafeEqual(x,y);};
 const pickLesson=l=>Object.fromEntries(['w','n','title','sense','theory','practice','hw','s','sound'].filter(k=>l[k]!==undefined).map(k=>[k,l[k]]));
+function runtimeCapabilities(env,c){
+ const serviceKey=String(env?.SUPABASE_SERVICE_ROLE_KEY||''),merchant=String(env?.WAYFORPAY_MERCHANT_ACCOUNT||''),waySecret=String(env?.WAYFORPAY_SECRET_KEY||''),bridge=String(env?.ATLAS_PAYMENT_BRIDGE_SECRET||''),cron=String(env?.CRON_SECRET||'');
+ return{serviceRoleConfigured:!!c.url&&!!serviceKey,wayForPayConfigured:!!merchant&&!!waySecret,bridgeConfigured:bridge.length>=32,cronConfigured:cron.length>=32};
+}
 async function readBody(req){
  let b=req.body;
  if(b===undefined){let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>131072)fail(413,'body_too_large');}b=raw;}
@@ -22,13 +26,13 @@ function mutationGuard(req,c){
  const token=cookies(req).find(x=>x.name===(c.local?'tv-csrf':'__Host-tv-csrf'))?.value;
  if(!/^[a-f0-9]{64}$/.test(token||'')||!same(token,req.headers['x-csrf-token']))fail(403,'csrf_required');
 }
-function createHandler({config,clientFactory=clientFor,courseLoader,artLoader}={}){
+function createHandler({config,clientFactory=clientFor,courseLoader,artLoader,runtimeEnv=process.env}={}){
  return async(req,res)=>{
   res.setHeader('Cache-Control','private, no-store, max-age=0');res.setHeader('Vary','Cookie');res.setHeader('X-Content-Type-Options','nosniff');const send=(n,data)=>res.status(n).json(data);
   try{
    const c=config||configFromEnv(),url=new URL(req.url,'https://invalid.local'),action=url.searchParams.get('action')||'session';
    if(!Object.hasOwn(METHODS,action))fail(404,'not_found');if(req.method!==METHODS[action]){res.setHeader('Allow',METHODS[action]);fail(405,'method_not_allowed');}
-   if(action==='health'){const bundleReady=await fs.access(path.join(process.cwd(),'_server','course.json')).then(()=>true,()=>false);return send(200,{version:'4.0.0-core',configured:!!c.key,bundleReady,emailEnabled:c.emailEnabled&&!!c.captchaSiteKey,captchaSiteKey:c.captchaSiteKey,csrf:csrf(req,res,c)});}
+   if(action==='health'){const bundleReady=await fs.access(path.join(process.cwd(),'_server','course.json')).then(()=>true,()=>false);return send(200,{version:'4.1.0-core',configured:!!c.key,bundleReady,emailEnabled:c.emailEnabled&&!!c.captchaSiteKey,captchaSiteKey:c.captchaSiteKey,capabilities:runtimeCapabilities(runtimeEnv,c),csrf:csrf(req,res,c)});}
    if(req.method!=='GET')mutationGuard(req,c);if(!c.key||!c.url)fail(503,'setup_required');
    const b=req.method!=='GET'?await readBody(req):null,client=clientFactory(req,res,c);
    if(action==='request-code'||action==='verify-code'){
@@ -37,7 +41,7 @@ function createHandler({config,clientFactory=clientFor,courseLoader,artLoader}={
      if(typeof b.captchaToken!=='string'||!b.captchaToken||b.captchaToken.length>4096)fail(400,'captcha_required');
      const {error}=await client.auth.signInWithOtp({email:address,options:{shouldCreateUser:true,captchaToken:b.captchaToken}});
      if(error?.status===429)fail(429,'rate_limited');if(error&&error.status>=500)fail(503,'email_unavailable');
-     return send(202,{message:'Перевір пошту. Доступ до кабінету відкриється лише за наявності покупки.'});
+     return send(202,{message:'Перевір пошту. Доступ до кабінету відкривається лише за підтвердженою покупкою.'});
     }
     if(!/^\d{6,10}$/.test(String(b.code||'')))fail(400,'invalid_code');
     const {data,error}=await client.auth.verifyOtp({email:address,token:String(b.code),type:'email'});
@@ -72,4 +76,4 @@ function createHandler({config,clientFactory=clientFor,courseLoader,artLoader}={
   }catch(e){if(!e.status)console.error('Academy request failed:',e.name);return send(e.status||500,{error:e.status?e.message:'server_error'});}
  };
 }
-module.exports={createHandler,pickLesson,readBody,mutationGuard};
+module.exports={createHandler,pickLesson,readBody,mutationGuard,runtimeCapabilities};
