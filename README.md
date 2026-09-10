@@ -61,9 +61,11 @@ Latest verified CI baseline on `feat/academy-access-wayforpay-20260910`:
 - full `npm audit`: 0 vulnerabilities
 - `git diff --check`: pass
 
-Landing bridge branch `feat/academy-ledger-bridge-20260910`: 13/13 callback/order-create tests plus diff check.
+Landing bridge branch `feat/academy-ledger-bridge-20260910`: callback 9/9, order-create 4/4, preview-health 4/4, diff check pass.
 
 Cloud verification has exercised the seven synthetic payment states, `approved → review → stale approved`, fresh Approved re-verification after review, and audited classification of an unclassified historical review. Every verification used scoped `provider=test` data and cleaned it before commit. No synthetic Auth users or test payment rows remain; WayForPay rows remain untouched.
+
+Measured Vercel preview state is intentionally still non-live: Atlas has public Supabase configuration but no service-role, WayForPay, bridge or cron server secrets; email login is disabled. Landing has WayForPay configured but Academy ledger mode is `off` and ledger URL/secret are absent. No checkout/provider action was used to obtain this measurement.
 
 See `docs/qa/2026-09-10-academy-payments.md` for the exact evidence and remaining live gates.
 
@@ -96,8 +98,8 @@ The repository is currently public and earlier Atlas material was historically p
 
 ## Remaining launch gates
 
-1. Confirm the Atlas Vercel preview has the required server-only service-role / WayForPay / bridge / cron configuration while keeping `ATLAS_EMAIL_ENABLED=false`; verify protected endpoints and bundle secret scans.
-2. Connect the landing preview in `shadow` mode and verify current checkout remains unaffected by shadow bridge failure.
+1. Configure the Atlas Vercel Preview server-only service-role / WayForPay / bridge / cron values while keeping `ATLAS_EMAIL_ENABLED=false`, then re-read preview health and verify payment/admin fail-closed paths.
+2. Configure landing Preview ledger URL/secret, switch only the feature preview to `shadow`, and verify current checkout behavior remains unaffected by bridge failure/success without charging a card.
 3. Review historical WayForPay preview windows. No historical commit without owner review of review/conflict/access dates.
 4. Configure custom SMTP/OTP/CAPTCHA and prove real login for the explicit owner admin identity.
 5. Real purchase and refund tests require explicit approval immediately before any spend/provider action.
