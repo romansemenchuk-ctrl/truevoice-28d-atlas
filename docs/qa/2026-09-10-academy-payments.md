@@ -6,11 +6,11 @@ Branches:
 - Atlas: `feat/academy-access-wayforpay-20260910`
 - Landing: `feat/academy-ledger-bridge-20260910`
 
-This document records automated local/CI verification plus the explicitly described cloud database verification below. It does not claim real OTP delivery, physical-device certification, a real WayForPay purchase/refund, historical customer import or production rollout.
+This document records automated local/CI verification plus the explicitly described cloud and preview verification below. It does not claim real OTP delivery, physical-device certification, a real WayForPay purchase/refund, historical customer import or production rollout.
 
 ## Verified Atlas baseline
 
-Reference current PR CI run: GitHub Actions `Academy Feature CI` run `34437261907`, head `768413a6dbc94debc864ed89b5968748aea1d447`.
+Reference full code CI run: GitHub Actions `Academy Feature CI` run `34437261907`, head `768413a6dbc94debc864ed89b5968748aea1d447`. Later documentation-only commits do not change the tested runtime implementation.
 
 Commands executed from a clean checkout:
 
@@ -141,7 +141,7 @@ Mechanics suite 9/9 proves:
 
 ## Landing bridge evidence
 
-Reference CI run: GitHub Actions `Academy Ledger Bridge CI` run `34431960224`, head `e9750e2f22e489d831efaa8d81b1e1e148403590`.
+Latest landing branch CI: GitHub Actions `Academy Ledger Bridge CI` run `34438436991`, head `310951e4c10c2237872bb05407efefe011883651`.
 
 Commands:
 
@@ -153,7 +153,7 @@ git diff --check d62205117291eb3f6192df0b343311acb3476e18 HEAD
 Result:
 - callback tests: 9/9
 - order-create tests: 4/4
-- total: 13/13
+- preview health contract: 4/4
 - diff check: pass
 
 Verified rollout contracts:
@@ -163,6 +163,8 @@ Verified rollout contracts:
 - `required` callback ledger failure remains retryable and does not return WayForPay accept
 - registration uses server-validated email/product/catalog price/reference
 - provider-event bridge body never forwards callback buyer email
+- preview-only health exposes only mode/configuration booleans; it never returns ledger URL, merchant ID or secret values
+- production health route returns 404
 
 ## Cloud database verification
 
@@ -240,18 +242,45 @@ Reference remediation docs from the advisor:
 - authenticated SECURITY DEFINER lint: https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable
 - password protection: https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection
 
-## Preview status
+## Measured preview state
 
-Vercel has READY deployments for the Atlas feature branch and landing bridge branch. The Atlas Academy health endpoint has reported Supabase configured with `emailEnabled=false`. Preview capability flags exist only outside `VERCEL_ENV=production` and expose booleans only, never secret values; production health omits the capability map entirely.
+Both Vercel feature deployments are READY. No production target was promoted.
 
-The previews remain protected by Vercel Authentication. The current Vercel connector can list/fetch protected deployments but does not expose project environment-variable editing, so service-role/WayForPay/bridge/cron secret presence still needs to be asserted from the actual preview response or Vercel project settings. No payment provider action has been attempted.
+Atlas preview health (`4.1.0-core`) returned HTTP 200 with no-store headers and a Secure/HttpOnly host-only CSRF cookie. Measured configuration:
+
+```text
+configured=true
+bundleReady=true
+emailEnabled=false
+captchaSiteKey=empty
+serviceRoleConfigured=false
+wayForPayConfigured=false
+bridgeConfigured=false
+cronConfigured=false
+```
+
+The capability map exists only in preview/dev and contains booleans only; production health omits it. A guest session request returned `401 login_required`. Some additional protected preview fetches are intercepted by Vercel Authentication before reaching the function, so they are not counted as app-level smoke evidence.
+
+Landing preview health returned HTTP 200/no-store with:
+
+```text
+mode=off
+ledgerUrlConfigured=false
+ledgerSecretConfigured=false
+wayForPayConfigured=true
+```
+
+This proves the landing preview already has its WayForPay configuration, but the Academy ledger bridge is intentionally inactive and cannot yet reach Atlas. Because mode is `off`, current checkout behavior remains unchanged. No checkout or provider action was invoked during this measurement.
+
+The current Vercel connector does not expose project environment-variable mutation. Therefore the next rollout step requires setting server-only Preview environment variables in Vercel project settings; this is a deployment-config gate rather than an application-code defect.
 
 ## Remaining live gates
 
 Not verified by this document:
-- Vercel preview service-role / WayForPay / bridge / cron secret configuration
-- authenticated admin payment API on the protected preview
-- landing preview in `shadow` against the Atlas preview
+- configure Atlas Preview `SUPABASE_SERVICE_ROLE_KEY`, `WAYFORPAY_MERCHANT_ACCOUNT`, `WAYFORPAY_SECRET_KEY`, `ATLAS_PAYMENT_BRIDGE_SECRET`, `CRON_SECRET`
+- configure landing Preview `ACADEMY_LEDGER_URL`, `ACADEMY_LEDGER_SECRET`, then set `ACADEMY_LEDGER_MODE=shadow`
+- authenticated admin payment API on the protected preview after those env values exist
+- shadow bridge end-to-end verification (without real charge)
 - historical WayForPay preview against real transaction history
 - custom SMTP / OTP template / CAPTCHA / Auth rate-limit configuration
 - real OTP to `ceo@truevoice.academy`
