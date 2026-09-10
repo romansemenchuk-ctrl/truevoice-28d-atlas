@@ -119,6 +119,10 @@ Initial Atlas policy:
 
 The business definition of “7 months” for Mini is deliberately fixed to **210 days**, not PostgreSQL calendar-month arithmetic.
 
+Access policy is applied when an entitlement is issued. The concrete `valid_from` / `valid_until` values become the historical grant snapshot. A later change to product policy affects newly issued grants, not already-issued entitlements, unless an administrator deliberately changes/revokes them through an audited operation.
+
+`products.enabled` controls whether a product may be used for new sale/import mapping. Disabling a product must **not** retroactively revoke valid access for existing customers.
+
 ### 4.3 Orders
 
 `tv_core.orders` is the durable purchase ledger.
@@ -156,8 +160,9 @@ An entitlement is active only if all are true:
 1. source order is approved;
 2. entitlement is not revoked;
 3. current time is on/after `valid_from`;
-4. `valid_until` is null or current time is before it;
-5. product/resource mapping remains enabled according to the agreed policy.
+4. `valid_until` is null or current time is before it.
+
+Current catalog availability does not retroactively participate in this check. Existing access ends only because its recorded validity expires, the source order becomes disqualifying, or the entitlement is explicitly revoked/changed through an audited path.
 
 A historical Mini order older than 210 days is still imported into the ledger, but its entitlement is already expired.
 
@@ -580,7 +585,9 @@ Verify:
 - historical Mini access starts at purchase time, not import time;
 - 210-day expiration rule;
 - lifetime Atlas rule;
-- `mini-upgrade` does not create a standalone Atlas entitlement.
+- `mini-upgrade` does not create a standalone Atlas entitlement;
+- disabling a catalog product does not revoke a previously issued valid entitlement;
+- changing a product-resource policy does not silently rewrite existing entitlement dates.
 
 ### Browser
 
