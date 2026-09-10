@@ -10,6 +10,7 @@ This branch turns Atlas into the first protected product inside a shared TrueVoi
 - `atlas-28d` grants lifetime Atlas access (`valid_until = NULL`).
 - `mini-upgrade` never grants Atlas by itself.
 - Refund/chargeback revokes the entitlement but does not delete the account. A stale replay of an older Approved event cannot restore a terminally revoked payment.
+- A newer verified `review` (for example amount/currency mismatch) suspends an existing Approved state. Review is a quarantine state: stale/equal non-terminal events cannot clear it; only a strictly newer verified Approved event can resolve it.
 - Admin is an explicit database role. Admins land in the student view and must deliberately open the Admin cabinet; internal methodology is fetched only after a second explicit admin action.
 
 ## Security boundaries
@@ -53,13 +54,15 @@ npm audit
 
 Latest verified CI baseline on `feat/academy-access-wayforpay-20260910`:
 
-- unit/SQL: 70 passing, 0 failing
+- unit/SQL: 72 passing, 0 failing
 - member browser: 14/14
 - mechanics browser: 9/9
 - `npm audit`: 0 vulnerabilities
 - `git diff --check`: pass
 
 Landing bridge branch `feat/academy-ledger-bridge-20260910`: 13/13 callback/order-create tests plus diff check.
+
+Cloud verification has also exercised the seven synthetic payment states and the additional `approved → review → stale approved` quarantine case through the production database RPCs, followed by scoped `provider=test` cleanup. No synthetic Auth users or test rows remain.
 
 See `docs/qa/2026-09-10-academy-payments.md` for the exact evidence and remaining live gates.
 
@@ -92,14 +95,13 @@ The repository is currently public and earlier Atlas material was historically p
 
 ## Remaining launch gates
 
-1. Apply and read back additive cloud migrations `2026091001–1004` in the approved TrueVoice Academy Supabase project; verify RLS/RPC grants and product rules.
-2. Run cloud synthetic QA seed/cleanup and prove no synthetic Auth users or surviving `provider=test` rows.
-3. Deploy an Atlas preview with server secrets, while keeping `ATLAS_EMAIL_ENABLED=false`; verify anonymous protected endpoints and bundle secret scans.
-4. Connect landing preview in `shadow` mode and verify current checkout remains unaffected by shadow bridge failure.
-5. Review historical WayForPay preview windows. No historical commit without owner review of review/conflict/access dates.
-6. Configure custom SMTP/OTP/CAPTCHA and prove real login for the explicit owner admin identity.
-7. Real purchase and refund tests require explicit approval immediately before any spend/provider action.
-8. Complete physical iPhone/Safari, Firefox, keyboard/screen-reader smoke, privacy disclosure, backup/restore and incident notes.
-9. Move the ledger to `required` and promote only after every gate passes.
+1. Confirm the Atlas Vercel preview has the required server-only service-role / WayForPay / bridge / cron configuration while keeping `ATLAS_EMAIL_ENABLED=false`; verify protected endpoints and bundle secret scans.
+2. Connect the landing preview in `shadow` mode and verify current checkout remains unaffected by shadow bridge failure.
+3. Review historical WayForPay preview windows. No historical commit without owner review of review/conflict/access dates.
+4. Configure custom SMTP/OTP/CAPTCHA and prove real login for the explicit owner admin identity.
+5. Real purchase and refund tests require explicit approval immediately before any spend/provider action.
+6. Complete physical iPhone/Safari, Firefox, keyboard/screen-reader smoke, privacy disclosure, backup/restore and incident notes.
+7. Resolve the public-repository/history/old-deployment exposure decision.
+8. Move the ledger to `required` and promote only after every gate passes.
 
 Anatomy artwork remains an artistic interpretation and the instructional diagrams are simplified; this is not a clinical illustration pack or a full scientific audit.
