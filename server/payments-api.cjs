@@ -1,6 +1,7 @@
 'use strict';
 const crypto=require('node:crypto');
 const {createPayments}=require('./payments.cjs');
+const {createQaRegistry}=require('./qa-registry.cjs');
 const {clientFor,configFromEnv}=require('./supabase.cjs');
 const {mutationGuard}=require('./academy.cjs');
 const MAX_BODY=131072;
@@ -10,24 +11,13 @@ async function readBody(req){let b=req.body;if(b===undefined){let raw='';for awa
 function authorizeBridge(req,secret){if(!secret||secret.length<32)fail(503,'bridge_not_configured');const h=String(req.headers.authorization||''),want='Bearer '+secret;if(!same(h,want))fail(403,'bridge_forbidden');}
 function exact(body,allowed){if(Object.keys(body).some(k=>!allowed.includes(k)))fail(400,'invalid_fields');}
 async function defaultAdminAuthorizer(req,res,academyConfig){const c=academyConfig||configFromEnv();if(!c.url||!c.key)fail(503,'setup_required');const client=clientFor(req,res,c),{data,error}=await client.auth.getUser();if(error||!data?.user?.id||!data.user.email_confirmed_at)fail(401,'login_required');const {data:account,error:accountError}=await client.rpc('tv_account');if(accountError)fail(accountError.code==='42501'?401:503,accountError.code==='42501'?'login_required':'database_unavailable');if(account?.user?.role!=='admin')fail(403,'admin_required');return{id:data.user.id,account,config:c};}
-function createHandler({payments,config={},adminAuthorizer=defaultAdminAuthorizer,adminGuard=mutationGuard}={}){let lazy=payments;const getPayments=()=>lazy||(lazy=createPayments());return async(req,res)=>{res.setHeader('Cache-Control','private, no-store, max-age=0');res.setHeader('X-Content-Type-Options','nosniff');const send=(n,b)=>res.status(n).json(b);try{
+function createHandler({payments,qaRegistry,config={},adminAuthorizer=defaultAdminAuthorizer,adminGuard=mutationGuard}={}){let lazy=payments,lazyQa=qaRegistry;const getPayments=()=>lazy||(lazy=createPayments()),getQa=()=>lazyQa||(lazyQa=createQaRegistry());return async(req,res)=>{res.setHeader('Cache-Control','private, no-store, max-age=0');res.setHeader('X-Content-Type-Options','nosniff');const send=(n,b)=>res.status(n).json(b);try{
  const url=new URL(req.url,'https://invalid.local'),action=url.searchParams.get('action');
- const bridgeActions=new Set(['register-order','provider-event']),adminActions=new Set(['registry','history-preview','history-commit','reconcile-reference','transfer-entitlement','set-revoked']);
- if(!bridgeActions.has(action)&&!adminActions.has(action))fail(404,'not_found');
- const expected=action==='registry'?'GET':'POST';if(req.method!==expected){res.setHeader('Allow',expected);fail(405,'method_not_allowed');}
- if(bridgeActions.has(action)){
-  if(!String(req.headers['content-type']||'').startsWith('application/json'))fail(415,'json_required');authorizeBridge(req,config.bridgeSecret??String(process.env.ATLAS_PAYMENT_BRIDGE_SECRET||''));const body=await readBody(req),p=getPayments();
-  if(action==='register-order'){exact(body,['reference','email','productId','amountMinor','currency','purchasedAt']);return send(200,{ok:true,result:await p.registerTrustedOrder(body)});}
-  if(['email','clientEmail','buyerEmail'].some(k=>Object.hasOwn(body,k)))fail(400,'ownership_field_forbidden');return send(200,{ok:true,result:await p.applyProviderEvent(body)});
- }
- const academyConfig=config.academyConfig||configFromEnv(),admin=await adminAuthorizer(req,res,academyConfig),p=getPayments();let body=null;
- if(req.method==='POST'){if(!String(req.headers['content-type']||'').startsWith('application/json'))fail(415,'json_required');adminGuard(req,academyConfig);body=await readBody(req);}
- if(action==='registry')return send(200,{ok:true,result:await p.registry(admin.id)});
- if(action==='history-preview'){exact(body,['dateBegin','dateEnd']);return send(200,{ok:true,result:await p.buildHistoryPreview(body)});}
- if(action==='history-commit'){exact(body,['dateBegin','dateEnd','digest']);return send(200,{ok:true,result:await p.historyCommit({actorId:admin.id,...body})});}
- if(action==='reconcile-reference'){exact(body,['reference']);return send(200,{ok:true,result:await p.reconcileReference(body.reference)});}
- if(action==='transfer-entitlement'){exact(body,['orderId','resourceKey','targetUserId','reason']);return send(200,{ok:true,result:await p.transferEntitlement({actorId:admin.id,...body})});}
- if(action==='set-revoked'){exact(body,['orderId','resourceKey','revoked','reason']);if(typeof body.revoked!=='boolean')fail(400,'invalid_fields');return send(200,{ok:true,result:await p.setRevoked({actorId:admin.id,...body})});}
- fail(404,'not_found');
+ const bridgeActions=new Set(['register-order','provider-event']),adminActions=new Set(['registry','history-preview','history-commit','reconcile-reference','transfer-entitlement','set-revoked','qa-seed','qa-cleanup']);
+ if(!bridgeActions.has(action)&&!adminActions.has(action))fail(404,'not_found');const expected=action==='registry'?'GET':'POST';if(req.method!==expected){res.setHeader('Allow',expected);fail(405,'method_not_allowed');}
+ if(bridgeActions.has(action)){if(!String(req.headers['content-type']||'').startsWith('application/json'))fail(415,'json_required');authorizeBridge(req,config.bridgeSecret??String(process.env.ATLAS_PAYMENT_BRIDGE_SECRET||''));const body=await readBody(req),p=getPayments();if(action==='register-order'){exact(body,['reference','email','productId','amountMinor','currency','purchasedAt']);return send(200,{ok:true,result:await p.registerTrustedOrder(body)});}if(['email','clientEmail','buyerEmail'].some(k=>Object.hasOwn(body,k)))fail(400,'ownership_field_forbidden');return send(200,{ok:true,result:await p.applyProviderEvent(body)});}
+ const academyConfig=config.academyConfig||configFromEnv(),admin=await adminAuthorizer(req,res,academyConfig);let body=null;if(req.method==='POST'){if(!String(req.headers['content-type']||'').startsWith('application/json'))fail(415,'json_required');adminGuard(req,academyConfig);body=await readBody(req);}
+ if(action==='qa-seed'){exact(body,[]);return send(200,{ok:true,result:await getQa().seed(admin.id)});}if(action==='qa-cleanup'){exact(body,[]);return send(200,{ok:true,result:await getQa().cleanup(admin.id)});}
+ const p=getPayments();if(action==='registry')return send(200,{ok:true,result:await p.registry(admin.id)});if(action==='history-preview'){exact(body,['dateBegin','dateEnd']);return send(200,{ok:true,result:await p.buildHistoryPreview(body)});}if(action==='history-commit'){exact(body,['dateBegin','dateEnd','digest']);return send(200,{ok:true,result:await p.historyCommit({actorId:admin.id,...body})});}if(action==='reconcile-reference'){exact(body,['reference']);return send(200,{ok:true,result:await p.reconcileReference(body.reference)});}if(action==='transfer-entitlement'){exact(body,['orderId','resourceKey','targetUserId','reason']);return send(200,{ok:true,result:await p.transferEntitlement({actorId:admin.id,...body})});}if(action==='set-revoked'){exact(body,['orderId','resourceKey','revoked','reason']);if(typeof body.revoked!=='boolean')fail(400,'invalid_fields');return send(200,{ok:true,result:await p.setRevoked({actorId:admin.id,...body})});}fail(404,'not_found');
  }catch(e){const status=Number.isInteger(e.status)?e.status:500;let safe='server_error';if(status<500&&e.code)safe=e.code;else if(status===503&&e.code)safe=e.code;else if(status===502)safe='provider_unavailable';return send(status,{error:safe});}};}
 module.exports={createHandler,readBody,authorizeBridge,defaultAdminAuthorizer};
