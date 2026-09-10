@@ -26,9 +26,10 @@ const focusPath=path.join(out,'js/modules/focus-mode.js');await writeFile(focusP
 await mkdir(path.join(out,'assets','brand'),{recursive:true});await cp(path.join(root,'assets','brand','logo.svg'),path.join(out,'assets','brand','logo.svg'));
 let html=await readFile(path.join(root,'index.html'),'utf8');html=html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'').replace('<html lang="uk"','<html data-member-state="gate" lang="uk"').replace('100% OFFLINE','ПРОГРЕС У КАБІНЕТІ');
 const extra=['atlas-upgrade.css','accessibility.css','academy.css','academy-interaction.css','mechanics.css'].map(f=>`<link rel="stylesheet" href="css/${f}">`).join('\n');
-html=html.replace('</head>',extra+'\n</head>').replace('<body>','<body>\n'+await readFile(path.join(root,'academy-shell.html'),'utf8')).replace('</body>','<script src="js/academy.js"></script>\n</body>');
+html=html.replace('</head>',extra+'\n</head>').replace('<body>','<body>\n'+await readFile(path.join(root,'academy-shell.html'),'utf8')).replace('</body>','<script src="js/demo-preview.js"></script>\n<script src="js/academy.js"></script>\n</body>');
 for(const m of [...html.matchAll(/(?:src|href)="((?:css|js)\/[^"?]+\.(?:js|css))"/g)])html=html.replaceAll(`"${m[1]}"`,`"${m[1]}?v=${hash(await readFile(path.join(out,m[1]))).slice(0,12)}"`);
 await access(path.join(out,'js','academy-admin.js'));
+await access(path.join(out,'js','demo-preview.js'));
 await writeFile(path.join(out,'index.html'),html);
-await writeFile(path.join(out,'version.json'),JSON.stringify({version:'4.1.0-academy',course:'28 original lessons preserved server-side',auth:'Supabase account shell; entitlement-gated Atlas',admin:'server-authorized; student view default',artworkSha256:expected},null,2));
+await writeFile(path.join(out,'version.json'),JSON.stringify({version:'4.1.0-academy',course:'28 original lessons preserved server-side',auth:'Supabase account shell; entitlement-gated Atlas',admin:'server-authorized; student view default',demo:'preview-only synthetic mode via ?demo=1',artworkSha256:expected},null,2));
 console.log('Built Academy 4.1: account-first shell, lazy protected Atlas, separate admin module.');
