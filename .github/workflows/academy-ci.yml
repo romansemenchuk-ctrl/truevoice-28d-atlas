@@ -17,14 +17,14 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - run: npm run build
-      - run: npm test
-      - run: npm install --no-save playwright@1.55.0
       - run: npx playwright install --with-deps chromium
-      - run: node tests/members-browser.cjs
-      - run: node tests/mechanics-browser.cjs
+      - run: npm run test:all
+      - run: npm audit --omit=dev
+      - run: git diff --check 7c2c25ae693f1f04d84df85f446a34600fe861d4 HEAD
