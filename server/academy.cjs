@@ -32,7 +32,13 @@ function createHandler({config,clientFactory=clientFor,courseLoader,artLoader,ru
   try{
    const c=config||configFromEnv(),url=new URL(req.url,'https://invalid.local'),action=url.searchParams.get('action')||'session';
    if(!Object.hasOwn(METHODS,action))fail(404,'not_found');if(req.method!==METHODS[action]){res.setHeader('Allow',METHODS[action]);fail(405,'method_not_allowed');}
-   if(action==='health'){const bundleReady=await fs.access(path.join(process.cwd(),'_server','course.json')).then(()=>true,()=>false);return send(200,{version:'4.1.0-core',configured:!!c.key,bundleReady,emailEnabled:c.emailEnabled&&!!c.captchaSiteKey,captchaSiteKey:c.captchaSiteKey,capabilities:runtimeCapabilities(runtimeEnv,c),csrf:csrf(req,res,c)});}
+   if(action==='health'){
+    const bundleReady=await fs.access(path.join(process.cwd(),'_server','course.json')).then(()=>true,()=>false);
+    const body={version:'4.1.0-core',configured:!!c.key,bundleReady,emailEnabled:c.emailEnabled&&!!c.captchaSiteKey,captchaSiteKey:c.captchaSiteKey};
+    if(runtimeEnv?.VERCEL_ENV!=='production')body.capabilities=runtimeCapabilities(runtimeEnv,c);
+    body.csrf=csrf(req,res,c);
+    return send(200,body);
+   }
    if(req.method!=='GET')mutationGuard(req,c);if(!c.key||!c.url)fail(503,'setup_required');
    const b=req.method!=='GET'?await readBody(req):null,client=clientFactory(req,res,c);
    if(action==='request-code'||action==='verify-code'){
