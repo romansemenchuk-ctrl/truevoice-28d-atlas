@@ -2,7 +2,10 @@
  "$schema":"https://openapi.vercel.sh/vercel.json","version":2,
  "buildCommand":"node scripts/build.mjs","outputDirectory":"dist","framework":null,
  "cleanUrls":true,"trailingSlash":false,
- "functions":{"api/academy.js":{"includeFiles":"_server/**"}},
+ "functions":{
+  "api/academy.js":{"includeFiles":"_server/**"},
+  "api/payments.js":{"maxDuration":30}
+ },
  "headers":[{"source":"/(.*)","headers":[
  {"key":"X-Content-Type-Options","value":"nosniff"},
  {"key":"X-Frame-Options","value":"DENY"},

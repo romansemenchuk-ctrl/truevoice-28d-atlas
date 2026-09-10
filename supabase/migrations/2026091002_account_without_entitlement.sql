@@ -76,5 +76,22 @@ BEGIN
  RETURN jsonb_build_object('name',btrim(p_name),'lastLesson',p_last_lesson);
 END $$;
 
+CREATE OR REPLACE FUNCTION public.tv_payment_order(p_provider text,p_reference text) RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS $$
+DECLARE out jsonb;
+BEGIN
+ SELECT jsonb_build_object(
+   'orderId',o.id,'reference',o.reference,'productId',o.product_id,
+   'amountMinor',o.amount_minor,'currency',o.currency,'status',o.status,
+   'purchasedAt',o.purchased_at,'statusObservedAt',o.status_observed_at
+ ) INTO out
+ FROM tv_core.orders o
+ WHERE o.provider=p_provider AND o.reference=p_reference;
+ IF out IS NULL THEN RAISE EXCEPTION 'unknown order' USING ERRCODE='22023'; END IF;
+ RETURN out;
+END $$;
+
 REVOKE ALL ON FUNCTION public.tv_account(),public.tv_save_profile(text,text) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.tv_account(),public.tv_save_profile(text,text) TO authenticated;
+REVOKE ALL ON FUNCTION public.tv_payment_order(text,text) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.tv_payment_order(text,text) TO service_role;
