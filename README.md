@@ -10,7 +10,7 @@ This branch turns Atlas into the first protected product inside a shared TrueVoi
 - `atlas-28d` grants lifetime Atlas access (`valid_until = NULL`).
 - `mini-upgrade` never grants Atlas by itself.
 - Refund/chargeback revokes the entitlement but does not delete the account. A stale replay of an older Approved event cannot restore a terminally revoked payment.
-- A newer verified `review` (for example amount/currency mismatch) suspends an existing Approved state. Review is a quarantine state: stale/equal non-terminal events cannot clear it; only a strictly newer verified Approved event can resolve it.
+- A newer verified `review` (for example amount/currency mismatch) suspends an existing Approved state. Review is a quarantine state: stale/equal non-terminal events cannot clear it; a fresh verified Approved re-check with a newer verification time may resolve it.
 - Admin is an explicit database role. Admins land in the student view and must deliberately open the Admin cabinet; internal methodology is fetched only after a second explicit admin action.
 
 ## Security boundaries
@@ -23,9 +23,9 @@ Payment operations are isolated in a separate server-only worker. `SUPABASE_SERV
 
 ## Payments and reconciliation
 
-The payment adapter supports exact WayForPay signing/verification, deterministic modern product mapping, explicit legacy mapping rules, integer minor-unit money parsing, status normalization, amount/currency mismatch → `review`, idempotent events and terminal refund/chargeback behavior.
+The payment adapter supports exact WayForPay signing/verification, deterministic modern product mapping, explicit legacy mapping rules, integer minor-unit money parsing, status normalization, amount/currency mismatch → `review`, idempotent events and terminal refund/chargeback behavior. `CHECK_STATUS` transitions use the local verification observation time, so an old provider processing timestamp cannot trap an order in review forever.
 
-Historical import is `preview → digest → re-fetch → commit`. Preview windows are capped at 31 days. Unknown products remain `review` with no entitlement; import never silently guesses access. Manual entitlement transfer changes ownership only and does not rewrite the financial buyer email.
+Historical import is `preview → digest → re-fetch → commit`. Preview windows are capped at 31 days. Unknown products remain `review` with no entitlement; import never silently guesses access. Admin may classify an unclassified historical review to a known product, but classification does not rewrite buyer/amount/currency/purchase time and does not grant access until a fresh provider verification resolves the review state. Manual entitlement transfer changes ownership only and does not rewrite the financial buyer email.
 
 A daily Vercel cron calls `/api/reconcile` at `03:17 UTC`. Each candidate is rechecked with WayForPay `CHECK_STATUS`; provider/network/signature failure preserves the last verified financial/access state.
 
@@ -54,15 +54,16 @@ npm audit
 
 Latest verified CI baseline on `feat/academy-access-wayforpay-20260910`:
 
-- unit/SQL: 72 passing, 0 failing
+- unit/SQL: 78 passing, 0 failing
 - member browser: 14/14
 - mechanics browser: 9/9
-- `npm audit`: 0 vulnerabilities
+- `npm audit --omit=dev`: 0 vulnerabilities
+- full `npm audit`: 0 vulnerabilities
 - `git diff --check`: pass
 
 Landing bridge branch `feat/academy-ledger-bridge-20260910`: 13/13 callback/order-create tests plus diff check.
 
-Cloud verification has also exercised the seven synthetic payment states and the additional `approved → review → stale approved` quarantine case through the production database RPCs, followed by scoped `provider=test` cleanup. No synthetic Auth users or test rows remain.
+Cloud verification has exercised the seven synthetic payment states, `approved → review → stale approved`, fresh Approved re-verification after review, and audited classification of an unclassified historical review. Every verification used scoped `provider=test` data and cleaned it before commit. No synthetic Auth users or test payment rows remain; WayForPay rows remain untouched.
 
 See `docs/qa/2026-09-10-academy-payments.md` for the exact evidence and remaining live gates.
 
