@@ -1,52 +1,105 @@
-# TrueVoice Academy / Atlas — Core 4.0 preview
+# TrueVoice Academy / Atlas — 4.1 preview
 
-This branch adds a shared Supabase Academy backend and a member account to Atlas 3.0. It is a preview, not a production migration of existing students or live checkout.
+This branch turns Atlas into the first protected product inside a shared TrueVoice Academy account. It includes a purchase entitlement ledger, WayForPay ingestion/reconciliation primitives, a locked-but-usable member cabinet, a separate admin cabinet and the refined 28D Atlas mechanics. It is still a preview branch: `main`, live checkout behavior and public login remain unchanged until the rollout gates below are completed.
 
-## Implemented
+## Access model
 
-- Shared `tv_core` schema: products, resources, product eligibility, orders, entitlements, roles, profiles, lesson catalog/state, payment-event and audit foundations. All 11 tables enable RLS. No customer or admin grants are seeded.
-- Supabase Auth through `@supabase/ssr` on the server. Auth cookies are HttpOnly, Secure and host-only in deployed environments. No service-role key is used. Each private request verifies the Auth user and checks current session/grants in PostgreSQL. Application sessions have a 12-hour maximum enforced in the database.
-- Student view by default, including for admins. Internal lesson methodology is fetched separately with a server-verified admin role. An Auth account without a paid entitlement does not unlock the application.
-- Account dashboard, own products, 28-day progress map, bookmarks, profile and per-lesson notes. Optimistic revisions expose conflicts instead of silently overwriting. Unsynced drafts are scoped to the user in sessionStorage. Legacy v3 progress is imported explicitly, not silently claimed by the first login.
-- Original 28 lesson text is unchanged. The build puts course JSON and four existing artwork plates in `_server/`, not `dist/`. Protected APIs serve these assets. The v3 controller is retained with explicit, checked build-time compatibility transforms.
-- Voice recordings use a per-account local IndexedDB database; they are not uploaded or included in JSON progress exports. Account navigation pauses practice clocks, the breath guide and microphone activity.
-- UI uses the existing TrueVoice Sun/Moon/axis mark, original landing contacts and black/crimson styling. The account status bar stays in document flow instead of intercepting anatomy controls.
+- One Supabase Auth identity is shared across TrueVoice products.
+- An account may exist without an active product entitlement. In that state the member keeps profile, products, support and logout, while protected Atlas content is never fetched.
+- `mini-base` and `mini-pro` grant Atlas for 210 days from the verified purchase time.
+- `atlas-28d` grants lifetime Atlas access (`valid_until = NULL`).
+- `mini-upgrade` never grants Atlas by itself.
+- Refund/chargeback revokes the entitlement but does not delete the account. A stale replay of an older Approved event cannot restore a terminally revoked payment.
+- Admin is an explicit database role. Admins land in the student view and must deliberately open the Admin cabinet; internal methodology is fetched only after a second explicit admin action.
+
+## Security boundaries
+
+Member APIs use Supabase SSR/Auth and the public publishable key. Auth cookies are HttpOnly, Secure and host-only in deployed environments. Each private request verifies the current Auth user and database session; mutations require same-origin + CSRF.
+
+Payment operations are isolated in a separate server-only worker. `SUPABASE_SERVICE_ROLE_KEY`, WayForPay credentials, the bridge secret and cron secret are never sent to the browser. The landing bridge authenticates server-to-server with `ATLAS_PAYMENT_BRIDGE_SECRET`; signed WayForPay callbacks are only a trigger for re-verification, never a source of buyer ownership. Buyer email/product/amount/currency are registered from the trusted checkout path before the payment widget is returned.
+
+`tv_core` stays outside the exposed Data API schemas. Narrow RPCs are used for member state; service-role-only RPCs handle payment/admin operations. All application tables retain RLS. Admin operations require the authenticated admin actor and write audit metadata.
+
+## Payments and reconciliation
+
+The payment adapter supports exact WayForPay signing/verification, deterministic modern product mapping, explicit legacy mapping rules, integer minor-unit money parsing, status normalization, amount/currency mismatch → `review`, idempotent events and terminal refund/chargeback behavior.
+
+Historical import is `preview → digest → re-fetch → commit`. Preview windows are capped at 31 days. Unknown products remain `review` with no entitlement; import never silently guesses access. Manual entitlement transfer changes ownership only and does not rewrite the financial buyer email.
+
+A daily Vercel cron calls `/api/reconcile` at `03:17 UTC`. Each candidate is rechecked with WayForPay `CHECK_STATUS`; provider/network/signature failure preserves the last verified financial/access state.
+
+Synthetic QA uses exactly seven deterministic `provider=test` payment scenarios and never creates Auth users. Cleanup removes only `provider=test` rows and preserves WayForPay/customer rows.
+
+## Member experience
+
+The Academy shell renders before protected course loading. Active members open Atlas lazily; locked members stay in the cabinet. Product cards expose active/lifetime/expired/refunded/chargeback/review states and finite expiry where applicable.
+
+The original 28 lesson text is retained. Course JSON and the four anatomy artwork plates live in `_server/`, not public `dist`, and are served only through authorized APIs. Voice recordings remain local in a per-account IndexedDB database and are not uploaded.
+
+The breath/anatomy experience uses one monotonic phase clock: phase caption, diaphragm, lung expansion and airflow share the same state. Holds stop airflow, exhale reverses it, pause freezes all instructional anatomy, reduced-motion removes decorative motion without hiding guidance, plate switching preserves phase, and hidden tabs pause the phonation demonstration.
 
 ## Run and test
 
-Node 22 is required. Run `npm ci`, `npm run build`, then `npm test`. Browser tests require Playwright/Chromium available to Node (`npm install --no-save playwright` in a disposable QA workspace, then `npx playwright install chromium`), followed by `npm run test:browser`. The browser suite starts its own localhost server on 8081 and uses actual PostgreSQL SQL/RLS through PGlite with synthetic identities. It never sends real emails, touches customer data, or connects the local fixture to Supabase.
+Node 22 is required.
 
-Do not serve the repository root publicly: it contains source lessons and `_server`. Serve only `dist` alongside the authorized Vercel API. A generic static server cannot implement the member API. `tests/local-server.cjs` is a localhost-only QA fixture, NOT an alternate login mechanism; it is neither loaded by `api/` nor copied into the distribution.
+```bash
+npm ci
+npx playwright install chromium
+npm run test:all
+npm audit
+```
 
-The build downloads a SHA-256-pinned artwork pack from the owner's media library. Set `ARTWORK_PACK` to a verified archived copy for offline builds. Artwork delivery itself is same-origin through the authorized API. Google Fonts still require connectivity.
+`test:all` runs build + unit/SQL tests + Chromium member tests + mechanics tests. The local browser harness binds only to `127.0.0.1:8081`, uses PGlite for PostgreSQL/RLS behavior and synthetic identities, sends no real email and touches no cloud/customer data.
 
-## Configuration and safety gate
+Latest verified CI baseline on `feat/academy-access-wayforpay-20260910`:
 
-`server/project.cjs` contains only the project's non-privileged publishable key. This is designed to be public; it does not grant database or course access. Override with `SUPABASE_PUBLISHABLE_KEY` when rotating. Never replace it with a service-role or secret key. `ATLAS_SITE_URL` must be the exact production origin; Vercel-generated deployment/branch origins are added automatically.
+- unit/SQL: 70 passing, 0 failing
+- member browser: 14/14
+- mechanics browser: 9/9
+- `npm audit`: 0 vulnerabilities
+- `git diff --check`: pass
 
-`ATLAS_EMAIL_ENABLED` defaults to false. Until custom SMTP, the Supabase email template containing `{{ .Token }}`, suitable Auth rate limits and Supabase CAPTCHA are configured and tested, the public page accurately says sign-in is not open. `TURNSTILE_SITE_KEY` is the public CAPTCHA site key; its secret belongs in Supabase Auth configuration. Do not enable the gate merely to make the button clickable.
+Landing bridge branch `feat/academy-ledger-bridge-20260910`: 13/13 callback/order-create tests plus diff check.
 
-The health endpoint reports configuration, email gate and server-bundle presence, not a completed customer-login test. Supabase may allow creation of an Auth identity; Academy access is independently purchase-gated. The publishable Auth endpoint is not a privilege boundary by itself.
+See `docs/qa/2026-09-10-academy-payments.md` for the exact evidence and remaining live gates.
 
-## Database operations
+## Configuration
 
-SQL sources in `supabase/migrations` correspond to the applied management migrations `academy_core_v1` and `academy_context_and_resume_v1` in the explicitly approved project. They rebuild a fresh local database. Do NOT blindly run these CREATE statements again on the initialized project or run CLI push without reconciling the management-generated migration versions. Read existing migration history first. The isolated live verification used synthetic rows inside a rolled-back subtransaction and left no test customers.
+```text
+SUPABASE_URL=https://aqskidnelqmowzfkjieg.supabase.co
+SUPABASE_PUBLISHABLE_KEY=
+ATLAS_SITE_URL=https://YOUR_PREVIEW_OR_PRODUCTION_HOST
+ATLAS_EMAIL_ENABLED=false
+TURNSTILE_SITE_KEY=
 
-Keep `tv_core` out of exposed Data API schemas. Only the narrow public RPCs are callable by authenticated users; their logic derives user ID from Auth, not request payload. Runtime has no purchase/admin-write endpoint. Future verified payment ingestion needs a separate, least-privilege server worker. Audit/payment tables are a foundation, not a completed worker or automation.
+SUPABASE_SERVICE_ROLE_KEY=
+WAYFORPAY_MERCHANT_ACCOUNT=
+WAYFORPAY_SECRET_KEY=
+ATLAS_PAYMENT_BRIDGE_SECRET=
+WAYFORPAY_LEGACY_RULES_JSON=[]
+CRON_SECRET=
+```
 
-## Still required before launch
+All values after `TURNSTILE_SITE_KEY` are server-only secrets. Never commit real values. `ATLAS_EMAIL_ENABLED` remains `false` until custom SMTP, OTP template, Auth rate limits and CAPTCHA are configured and a real OTP is verified.
 
-1. Configure and test actual SMTP/OTP/CAPTCHA delivery. No real OTP email has been sent by this work.
-2. Confirm the owner's Auth identity, then assign admin explicitly. No first-user-is-admin rule exists.
-3. Agree exact product/access durations, import trusted historical orders with a dry run and payment reconciliation, and implement idempotent WayForPay ingestion/outbox with refund/chargeback handling. The existing landing/checkout/SendPulse flow is untouched.
-4. Review deployment and actual iPhone/Safari/Firefox behavior, assistive technology, load/concurrency and operational backups. Chromium with a synthetic microphone is not physical-device certification.
-5. Decide how to handle the existing PUBLIC repository/history and old public deployments. New API gating cannot recall previously published copies. Do not add new confidential content here before making that decision.
+The landing integration is separately gated by `ACADEMY_LEDGER_MODE=off|shadow|required`. `off` makes no Academy request; `shadow` records/logs bridge failures without changing current checkout behavior; `required` is the eventual fail-closed production mode and must not be enabled until the full rollout gates pass.
 
-Anatomy artwork remains an artistic interpretation and the diagrams are simplified; this stage is not a new clinical illustration pack or full scientific audit. The larger requested animation/illustration refinement remains a subsequent stage. The user's business card was not present in the attachments and has not been incorporated.
+## Build/deployment safety
 
-## References
+Do not serve the repository root publicly; source lessons and `_server` are intentionally outside `dist`. A generic static host cannot implement Academy authorization. The build output and protected asset paths contain no service-role or WayForPay secret values.
 
-- https://supabase.com/docs/guides/auth/server-side/creating-a-client
-- https://supabase.com/docs/guides/auth/auth-email-passwordless
-- https://supabase.com/docs/guides/database/postgres/row-level-security
-- https://supabase.com/docs/guides/auth/auth-smtp
+The repository is currently public and earlier Atlas material was historically public. New access controls cannot recall already-published copies. Confidential/internal content should not be expanded here until the repository/history/old-deployment exposure decision is made.
+
+## Remaining launch gates
+
+1. Apply and read back additive cloud migrations `2026091001–1004` in the approved TrueVoice Academy Supabase project; verify RLS/RPC grants and product rules.
+2. Run cloud synthetic QA seed/cleanup and prove no synthetic Auth users or surviving `provider=test` rows.
+3. Deploy an Atlas preview with server secrets, while keeping `ATLAS_EMAIL_ENABLED=false`; verify anonymous protected endpoints and bundle secret scans.
+4. Connect landing preview in `shadow` mode and verify current checkout remains unaffected by shadow bridge failure.
+5. Review historical WayForPay preview windows. No historical commit without owner review of review/conflict/access dates.
+6. Configure custom SMTP/OTP/CAPTCHA and prove real login for the explicit owner admin identity.
+7. Real purchase and refund tests require explicit approval immediately before any spend/provider action.
+8. Complete physical iPhone/Safari, Firefox, keyboard/screen-reader smoke, privacy disclosure, backup/restore and incident notes.
+9. Move the ledger to `required` and promote only after every gate passes.
+
+Anatomy artwork remains an artistic interpretation and the instructional diagrams are simplified; this is not a clinical illustration pack or a full scientific audit.
