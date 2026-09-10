@@ -1,6 +1,7 @@
 -- A newer verified review (for example amount/currency mismatch) must suspend
--- an already-approved order. Entitlements remain immutable; can_access() already
--- requires orders.status='approved', so review removes access without deleting history.
+-- an already-approved order. Review is a quarantine state: stale/non-terminal
+-- events cannot clear it. A strictly newer verified Approved event may resolve it.
+-- Entitlements remain immutable; can_access() already requires orders.status='approved'.
 CREATE OR REPLACE FUNCTION public.tv_apply_payment_status(
  p_provider text,p_reference text,p_status text,p_observed_at timestamptz,p_event_key text,p_payload_hash text
 ) RETURNS jsonb
@@ -41,6 +42,13 @@ BEGIN
    v_next:=v_order.status;
  ELSIF p_status IN ('refunded','chargeback') THEN
    v_next:=p_status;
+ ELSIF v_order.status='review' THEN
+   IF p_status='approved'
+      AND p_observed_at>coalesce(v_order.status_observed_at,'-infinity'::timestamptz) THEN
+     v_next:='approved';
+   ELSE
+     v_next:='review';
+   END IF;
  ELSIF p_status='review'
        AND p_observed_at>=coalesce(v_order.status_observed_at,'-infinity'::timestamptz) THEN
    v_next:='review';
