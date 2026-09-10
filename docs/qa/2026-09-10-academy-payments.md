@@ -10,7 +10,7 @@ This document records automated local/CI verification plus the explicitly descri
 
 ## Verified Atlas baseline
 
-Reference full code CI run: GitHub Actions `Academy Feature CI` run `34437261907`, head `768413a6dbc94debc864ed89b5968748aea1d447`. Later documentation-only commits do not change the tested runtime implementation.
+Reference full code CI run: GitHub Actions `Academy Feature CI` run `34439247967`, head `3382d2681ad7f6dd9b36f95d1019b85efd4ab013`.
 
 Commands executed from a clean checkout:
 
@@ -25,7 +25,7 @@ git diff --check 7c2c25ae693f1f04d84df85f446a34600fe861d4 HEAD
 
 Result:
 - clean `npm ci`: pass
-- unit/SQL: 78 passing, 0 failing
+- unit/SQL: 80 passing, 0 failing
 - member browser: 14/14
 - mechanics browser: 9/9
 - production dependency audit: 0 vulnerabilities
@@ -57,7 +57,9 @@ Automated SQL/RLS tests prove:
 
 Automated tests prove:
 - bridge bearer secret is required and compared in constant-time code paths
-- payment API accepts JSON only and enforces a request-body cap
+- `bridge-health` is GET-only, validates the bridge bearer and returns before payment-worker, database or WayForPay initialization; it is a zero-write connectivity preflight
+- wrong bearer is denied even on the zero-write preflight
+- payment API accepts JSON only and enforces a request-body cap for mutation actions
 - trusted order registration uses server-supplied checkout ownership facts
 - callback/provider-event payload cannot set buyer ownership email
 - signed callback is a trigger for `CHECK_STATUS`, not the source of ownership
@@ -141,7 +143,7 @@ Mechanics suite 9/9 proves:
 
 ## Landing bridge evidence
 
-Latest landing branch CI: GitHub Actions `Academy Ledger Bridge CI` run `34438436991`, head `310951e4c10c2237872bb05407efefe011883651`.
+Latest landing branch CI: GitHub Actions `Academy Ledger Bridge CI` run `34439966602`, head `118b326c694dd411d72cf5af3abf6efe7f059701`.
 
 Commands:
 
@@ -151,9 +153,9 @@ git diff --check d62205117291eb3f6192df0b343311acb3476e18 HEAD
 ```
 
 Result:
-- callback tests: 9/9
-- order-create tests: 4/4
-- preview health contract: 4/4
+- callback tests: 10/10
+- order-create tests: 6/6
+- preview health / zero-write bridge probe: 5/5
 - diff check: pass
 
 Verified rollout contracts:
@@ -163,8 +165,15 @@ Verified rollout contracts:
 - `required` callback ledger failure remains retryable and does not return WayForPay accept
 - registration uses server-validated email/product/catalog price/reference
 - provider-event bridge body never forwards callback buyer email
-- preview-only health exposes only mode/configuration booleans; it never returns ledger URL, merchant ID or secret values
+- preview-only health exposes only mode/configuration booleans and `bridgeReachable`; it never returns ledger URL, merchant ID, bridge secret, Vercel OIDC token or protection-bypass value
 - production health route returns 404
+- checkout and callback forward the short-lived Vercel Function `x-vercel-oidc-token` as `x-vercel-trusted-oidc-idp-token`
+- Vercel Trusted Sources OIDC takes precedence over the long-lived Protection Bypass fallback
+- optional Protection Bypass is sent only as `x-vercel-protection-bypass` when OIDC is absent
+- neither OIDC nor bypass is placed in the bridge URL or JSON body
+- bridge reachability is tested with GET `action=bridge-health`, so connectivity can be proven before any order/provider/database mutation
+
+Vercel introduced Trusted Sources for Deployment Protection in 2026 and recommends short-lived OIDC for project-to-project access instead of sharing a long-lived Protection Bypass secret. The current landing implementation follows that preferred path while retaining the older bypass as a fallback.
 
 ## Cloud database verification
 
@@ -246,7 +255,7 @@ Reference remediation docs from the advisor:
 
 Both Vercel feature deployments are READY. No production target was promoted.
 
-Atlas preview health (`4.1.0-core`) returned HTTP 200 with no-store headers and a Secure/HttpOnly host-only CSRF cookie. Measured configuration:
+Atlas preview health (`4.1.0-core`) returned HTTP 200 with no-store headers and a Secure/HttpOnly host-only CSRF cookie before the manual configuration step. Measured configuration:
 
 ```text
 configured=true
@@ -259,9 +268,9 @@ bridgeConfigured=false
 cronConfigured=false
 ```
 
-The capability map exists only in preview/dev and contains booleans only; production health omits it. A guest session request returned `401 login_required`. Some additional protected preview fetches are intercepted by Vercel Authentication before reaching the function, so they are not counted as app-level smoke evidence.
+The capability map exists only in preview/dev and contains booleans only; production health omits it. A guest session request returned `401 login_required`. The current Atlas deployment containing zero-write `bridge-health` is READY. Some protected preview fetches are intercepted by Vercel Authentication before reaching the function, so they are not counted as app-level smoke evidence.
 
-Landing preview health returned HTTP 200/no-store with:
+Landing preview was previously measured before any manual Academy env changes as:
 
 ```text
 mode=off
@@ -270,17 +279,20 @@ ledgerSecretConfigured=false
 wayForPayConfigured=true
 ```
 
-This proves the landing preview already has its WayForPay configuration, but the Academy ledger bridge is intentionally inactive and cannot yet reach Atlas. Because mode is `off`, current checkout behavior remains unchanged. No checkout or provider action was invoked during this measurement.
+This proves the landing preview already has its WayForPay configuration, but the Academy ledger bridge was intentionally inactive. The newer deployment adds `bridgeReachable` and Trusted Sources support; an external re-fetch through the connector was intercepted by Vercel Authentication, so no unmeasured configuration value is inferred from that interception. No checkout or provider action was invoked during these measurements.
 
-The current Vercel connector does not expose project environment-variable mutation. Therefore the next rollout step requires setting server-only Preview environment variables in Vercel project settings; this is a deployment-config gate rather than an application-code defect.
+The current Vercel connector does not expose project environment-variable mutation or Trusted Sources configuration. Therefore the next rollout step is a deployment-config gate in Vercel project settings rather than an application-code defect.
 
 ## Remaining live gates
 
 Not verified by this document:
 - configure Atlas Preview `SUPABASE_SERVICE_ROLE_KEY`, `WAYFORPAY_MERCHANT_ACCOUNT`, `WAYFORPAY_SECRET_KEY`, `ATLAS_PAYMENT_BRIDGE_SECRET`, `CRON_SECRET`
+- preferred: Atlas Vercel Settings → Deployment Protection → Trusted Sources, authorize `truevoice-landing` Preview → Atlas Preview
 - configure landing Preview `ACADEMY_LEDGER_URL`, `ACADEMY_LEDGER_SECRET`, then set `ACADEMY_LEDGER_MODE=shadow`
+- fallback only if Trusted Sources is unavailable: configure `ACADEMY_LEDGER_VERCEL_BYPASS`
+- re-read landing preview health and require `bridgeReachable=true` before any order/provider operation
 - authenticated admin payment API on the protected preview after those env values exist
-- shadow bridge end-to-end verification (without real charge)
+- shadow bridge order registration test without charging a card
 - historical WayForPay preview against real transaction history
 - custom SMTP / OTP template / CAPTCHA / Auth rate-limit configuration
 - real OTP to `ceo@truevoice.academy`
